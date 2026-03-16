@@ -623,12 +623,22 @@ app.delete('/api/quizzes/:id', middleware.auth, async (req, res) => {
 });
 
 // QUIZ LEADERBOARD ROUTES
-// Submit quiz result
+// Submit quiz result (one-time attempt only)
 app.post('/api/quizzes/:quizId/submit', middleware.auth, async (req, res) => {
   try {
     const { quizId } = req.params;
     const { score, timeSpent } = req.body;
     const userId = req.user._id || req.user.id;
+
+    // Check if user has already attempted this quiz
+    const existingAttempt = await leaderboardCollection.findOne({
+      quizId,
+      userId: userId.toString()
+    });
+
+    if (existingAttempt) {
+      return res.status(400).json({ error: 'You have already attempted this quiz. You can review your previous attempt.' });
+    }
 
     // Create leaderboard entry
     const leaderboardEntry = {
@@ -640,12 +650,8 @@ app.post('/api/quizzes/:quizId/submit', middleware.auth, async (req, res) => {
       completedAt: new Date(),
     };
 
-    // Upsert (update if exists, insert if not)
-    const result = await leaderboardCollection.updateOne(
-      { quizId, userId: userId.toString() },
-      { $set: leaderboardEntry },
-      { upsert: true }
-    );
+    // Insert new entry (no upsert)
+    await leaderboardCollection.insertOne(leaderboardEntry);
 
     // Update user points
     const totalPoints = await leaderboardCollection.aggregate([
@@ -682,6 +688,31 @@ app.get('/api/quizzes/:quizId/leaderboard', async (req, res) => {
   } catch (error) {
     console.error('Leaderboard fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
+});
+
+// Check if user has attempted a quiz
+app.get('/api/quizzes/:quizId/check-attempt', middleware.auth, async (req, res) => {
+  try {
+    const { quizId } = req.params;
+    const userId = req.user._id || req.user.id;
+
+    const attempt = await leaderboardCollection.findOne({
+      quizId,
+      userId: userId.toString()
+    });
+
+    res.json({ 
+      hasAttempted: !!attempt,
+      attempt: attempt ? {
+        points: attempt.points,
+        timeSpent: attempt.timeSpent,
+        completedAt: attempt.completedAt
+      } : null
+    });
+  } catch (error) {
+    console.error('Check attempt error:', error);
+    res.status(500).json({ error: 'Failed to check attempt status' });
   }
 });
 

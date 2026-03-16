@@ -59,6 +59,8 @@ export const quizzesAPI = {
     api.post(`/api/quizzes/${quizId}/submit`, { score, timeSpent }),
   getLeaderboard: (quizId: string) =>
     api.get(`/api/quizzes/${quizId}/leaderboard`),
+  checkAttempt: (quizId: string) =>
+    api.get(`/api/quizzes/${quizId}/check-attempt`),
 };
 
 // Users APIs

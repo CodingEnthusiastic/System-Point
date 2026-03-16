@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { courses as initialCourses, Course, Lesson } from '@/data/mockData';
 import { Play, Clock, ChevronRight, ArrowLeft, CheckCircle, BookOpen, Loader } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getImageUrl } from '@/lib/utils';
 
 export default function LearnPage() {
+  const { courseId, lessonId } = useParams<{ courseId?: string; lessonId?: string }>();
+  const navigate = useNavigate();
+
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
@@ -52,6 +56,24 @@ export default function LearnPage() {
     fetchCourses();
   }, []);
 
+  // Handle URL-based course/lesson selection
+  useEffect(() => {
+    if (courseId) {
+      const course = courses.find(c => c.id === courseId);
+      if (course) {
+        setSelectedCourse(course);
+        if (lessonId) {
+          const lesson = course.lessons.find(l => l.id === lessonId);
+          if (lesson) {
+            setActiveLesson(lesson);
+          }
+        } else {
+          setActiveLesson(course.lessons[0] || null);
+        }
+      }
+    }
+  }, [courseId, lessonId, courses]);
+
   const categories = ['All', 'Fundamentals', 'HLD', 'LLD'];
   const filtered = filter === 'All' ? courses : courses.filter((c) => c.category === filter);
 
@@ -72,7 +94,7 @@ export default function LearnPage() {
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
         {/* Back */}
         <button
-          onClick={() => { setSelectedCourse(null); setActiveLesson(null); }}
+          onClick={() => navigate('/learn')}
           className="neu-btn px-4 py-2 bg-secondary text-foreground inline-flex items-center gap-2 text-sm cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Courses
@@ -137,7 +159,7 @@ export default function LearnPage() {
               {selectedCourse.lessons.map((lesson, i) => (
                 <button
                   key={lesson.id}
-                  onClick={() => setActiveLesson(lesson)}
+                  onClick={() => navigate(`/learn/${selectedCourse.id}/${lesson.id}`)}
                   className={`w-full text-left p-4 flex items-start gap-3 transition-all cursor-pointer ${
                     currentLesson.id === lesson.id ? 'bg-primary/20' : 'hover:bg-secondary'
                   }`}
@@ -208,13 +230,14 @@ export default function LearnPage() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.3, delay: i * 0.05 }}
+              className="h-full"
             >
               <button
-                onClick={() => setSelectedCourse(course)}
-                className="w-full text-left group cursor-pointer"
+                onClick={() => navigate(`/learn/${course.id}`)}
+                className="w-full text-left group cursor-pointer h-full"
               >
-                <div className="neu-card-blue overflow-hidden">
-                  <div className="relative aspect-video overflow-hidden">
+                <div className="neu-card-blue overflow-hidden h-full flex flex-col">
+                  <div className="relative aspect-video overflow-hidden shrink-0">
                     <img
                       src={getImageUrl(course.thumbnail)}
                       alt={course.title}
@@ -229,10 +252,10 @@ export default function LearnPage() {
                       <span className="neu-badge-blue px-3 py-1">{course.category}</span>
                     </div>
                   </div>
-                  <div className="p-5">
-                    <h3 className="font-bold text-lg mb-2 group-hover:text-primary transition-colors">{course.title}</h3>
+                  <div className="p-5 flex flex-col flex-1">
+                    <h3 className="font-bold text-lg mb-2 group-hover:text-primary transition-colors line-clamp-2">{course.title}</h3>
                     <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{course.description}</p>
-                    <div className="flex items-center justify-between text-xs font-mono text-muted-foreground">
+                    <div className="flex items-center justify-between text-xs font-mono text-muted-foreground mt-auto">
                       <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" /> {course.lessons.length} lessons</span>
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {course.totalDuration}</span>
                     </div>

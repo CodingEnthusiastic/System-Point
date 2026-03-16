@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { articles as mockArticles, Article } from '@/data/mockData';
-import { ArrowLeft, ChevronLeft, ChevronRight, Calendar, User, Tag } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Calendar, User, Tag, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getImageUrl } from '@/lib/utils';
 
@@ -43,9 +44,25 @@ function ImageCarousel({ images }: { images: string[] }) {
 }
 
 export default function ArticlesPage() {
+  const { id } = useParams<{ id?: string }>();
+  const navigate = useNavigate();
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [articles, setArticles] = useState<Article[]>(mockArticles);
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+
+  // Handle URL-based article selection
+  useEffect(() => {
+    if (id) {
+      const article = articles.find(a => a.id === id);
+      if (article) {
+        setSelectedArticle(article);
+      }
+    } else {
+      setSelectedArticle(null);
+    }
+  }, [id, articles]);
 
   // Fetch articles from API
   useEffect(() => {
@@ -85,7 +102,7 @@ export default function ArticlesPage() {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-4xl mx-auto space-y-6">
         <button
-          onClick={() => setSelectedArticle(null)}
+          onClick={() => navigate('/articles')}
           className="neu-btn px-4 py-2 bg-secondary text-foreground inline-flex items-center gap-2 text-sm cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Articles
@@ -138,8 +155,64 @@ export default function ArticlesPage() {
         <p className="text-muted-foreground font-mono text-sm">IN-DEPTH SYSTEM DESIGN ARTICLES</p>
       </div>
 
+      {/* Search and Filter */}
+      <div className="space-y-4">
+        <div className="neu-input w-full px-4 py-3 text-foreground border-2 border-foreground flex items-center gap-2" style={{ boxShadow: '2px 2px 0px #000' }}>
+          <input
+            type="text"
+            placeholder="Search articles by title, author..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 bg-transparent outline-none font-mono text-sm"
+          />
+        </div>
+
+        {/* Tag Filter */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setSelectedTag(null)}
+            className={`px-4 py-2 text-sm font-bold tracking-wider border-2 cursor-pointer transition-all ${
+              selectedTag === null 
+                ? 'bg-primary text-primary-foreground border-primary' 
+                : 'bg-secondary text-foreground border-foreground hover:bg-primary/20'
+            }`}
+            style={{ boxShadow: '2px 2px 0px #000' }}
+          >
+            All Tags
+          </button>
+          {Array.from(new Set(articles.flatMap(a => a.tags))).map((tag) => (
+            <button
+              key={tag}
+              onClick={() => setSelectedTag(tag)}
+              className={`px-4 py-2 text-sm font-bold tracking-wider border-2 cursor-pointer transition-all ${
+                selectedTag === tag 
+                  ? 'bg-accent-cyan text-background border-accent-cyan' 
+                  : 'bg-secondary text-foreground border-foreground hover:bg-accent-cyan/20'
+              }`}
+              style={{ boxShadow: '2px 2px 0px #000' }}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+
+        {/* Results count */}
+        <p className="text-sm text-muted-foreground font-mono">
+          Showing {articles.filter(a => 
+            (searchQuery === '' || a.title.toLowerCase().includes(searchQuery.toLowerCase()) || a.author.toLowerCase().includes(searchQuery.toLowerCase())) &&
+            (selectedTag === null || a.tags.includes(selectedTag))
+          ).length} articles
+        </p>
+      </div>
+
+      {/* Articles Grid */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {articles.map((article, i) => (
+        {articles
+          .filter(a => 
+            (searchQuery === '' || a.title.toLowerCase().includes(searchQuery.toLowerCase()) || a.author.toLowerCase().includes(searchQuery.toLowerCase())) &&
+            (selectedTag === null || a.tags.includes(selectedTag))
+          )
+          .map((article, i) => (
           <motion.div
             key={article.id}
             initial={{ opacity: 0, y: 20 }}
@@ -147,12 +220,12 @@ export default function ArticlesPage() {
             transition={{ duration: 0.3, delay: i * 0.1 }}
           >
             <button
-              onClick={() => setSelectedArticle(article)}
-              className="w-full text-left group cursor-pointer"
+              onClick={() => navigate(`/articles/${article.id}`)}
+              className="w-full text-left group cursor-pointer h-full"
             >
-              <div className="neu-card overflow-hidden h-full">
+              <div className="neu-card overflow-hidden h-full flex flex-col">
                 {article.images[0] && (
-                  <div className="aspect-video overflow-hidden">
+                  <div className="aspect-video overflow-hidden shrink-0">
                     <img
                       src={getImageUrl(article.images[0])}
                       alt={article.title}
@@ -160,14 +233,14 @@ export default function ArticlesPage() {
                     />
                   </div>
                 )}
-                <div className="p-5">
-                  <div className="flex flex-wrap gap-2 mb-3">
+                <div className="p-5 flex flex-col flex-1">
+                  <div className="flex flex-wrap gap-2 mb-3 h-6">
                     {article.tags.slice(0, 2).map((tag) => (
                       <span key={tag} className="neu-badge-blue px-2 py-0.5 text-[10px]">{tag}</span>
                     ))}
                   </div>
-                  <h3 className="font-bold text-lg mb-2 group-hover:text-primary transition-colors">{article.title}</h3>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
+                  <h3 className="font-bold text-lg mb-2 group-hover:text-primary transition-colors line-clamp-2">{article.title}</h3>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono mt-auto">
                     <span className="flex items-center gap-1"><User className="w-3 h-3" /> {article.author}</span>
                     <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {article.createdAt}</span>
                   </div>

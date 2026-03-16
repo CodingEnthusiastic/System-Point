@@ -20,8 +20,12 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/learn" element={<LearnPage />} />
+            <Route path="/learn/:courseId" element={<LearnPage />} />
+            <Route path="/learn/:courseId/:lessonId" element={<LearnPage />} />
             <Route path="/articles" element={<ArticlesPage />} />
+            <Route path="/articles/:id" element={<ArticlesPage />} />
             <Route path="/quizzes" element={<QuizzesPage />} />
+            <Route path="/quizzes/:id" element={<QuizzesPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/admin" element={<AdminPage />} />
           </Route>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { quizzes as mockQuizzes, Quiz } from '@/data/mockData';
 import { quizzesAPI } from '@/lib/api';
 import TabViolationScreen from '@/components/quiz/TabViolationScreen';
@@ -8,6 +9,9 @@ import QuizResultsScreen from '@/components/quiz/QuizResultsScreen';
 import QuizzesListScreen from '@/components/quiz/QuizzesListScreen';
 
 export default function QuizzesPage() {
+  const { id } = useParams<{ id?: string }>();
+  const navigate = useNavigate();
+
   // Screen state
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
   const [showPreQuizScreen, setShowPreQuizScreen] = useState(false);
@@ -28,6 +32,17 @@ export default function QuizzesPage() {
   // Security state
   const [tabViolation, setTabViolation] = useState(false);
   const [quizAborted, setQuizAborted] = useState(false);
+
+  // Handle URL-based quiz selection
+  useEffect(() => {
+    if (id) {
+      const quiz = quizzes.find(q => q.id === id);
+      if (quiz) {
+        setSelectedQuiz(quiz);
+        setShowPreQuizScreen(true);
+      }
+    }
+  }, [id, quizzes]);
 
   // Fetch quizzes from API
   useEffect(() => {
@@ -172,12 +187,11 @@ export default function QuizzesPage() {
     setQuizActive(false);
     setTabViolation(false);
     setQuizAborted(false);
-    setSelectedQuiz(quiz);
-    setShowPreQuizScreen(true);
+    navigate(`/quizzes/${quiz.id}`);
   };
 
   const handleBackToQuizzes = () => {
-    setSelectedQuiz(null);
+    navigate('/quizzes');
     resetQuiz();
   };
 
