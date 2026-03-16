@@ -1,6 +1,8 @@
 # System Design Platform
 
 A comprehensive platform for learning and mastering system design concepts with courses, articles, and interactive quizzes.
+Deployed Frontend : https://systempoint.netlify.app/
+Deployed Backend : https://system-design-backend-2oim.onrender.com
 
 ## Project Setup
 
