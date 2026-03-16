@@ -96,6 +96,13 @@ npm run build        # Build for production
 npm run lint         # Run linter
 ```
 
+## Some Insights
+<img width="1919" height="911" alt="image" src="https://github.com/user-attachments/assets/ead916f7-c200-4169-9c4a-4791c65ceea7" />
+<img width="1919" height="970" alt="image" src="https://github.com/user-attachments/assets/5b965b59-3e8d-4c2c-8087-753430901b35" />
+
+
+
+
 ## Deployment
 
 Build the frontend:
