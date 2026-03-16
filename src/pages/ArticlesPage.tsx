@@ -47,22 +47,26 @@ export default function ArticlesPage() {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
-  const [articles, setArticles] = useState<Article[]>(mockArticles);
-  const [loading, setLoading] = useState(false);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Handle URL-based article selection
   useEffect(() => {
-    if (id) {
+    if (dataLoaded && id) {
       const article = articles.find(a => a.id === id);
       if (article) {
         setSelectedArticle(article);
+      } else {
+        // Article not found, go back to list
+        setSelectedArticle(null);
       }
-    } else {
+    } else if (!id) {
       setSelectedArticle(null);
     }
-  }, [id, articles]);
+  }, [id, articles, dataLoaded]);
 
   // Fetch articles from API
   useEffect(() => {
@@ -83,22 +87,21 @@ export default function ArticlesPage() {
             createdAt: a.createdAt.split('T')[0],
             tags: a.tags || [],
           }));
-          if (transformed.length > 0) {
-            setArticles(transformed);
-          }
+          setArticles(transformed.length > 0 ? transformed : mockArticles);
         }
       } catch (error) {
         console.log('Using mock data (API not available)');
-        // Use mock data as fallback
+        setArticles(mockArticles);
       } finally {
         setLoading(false);
+        setDataLoaded(true);
       }
     };
 
     fetchArticles();
   }, []);
 
-  if (selectedArticle) {
+  if (selectedArticle && dataLoaded) {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-4xl mx-auto space-y-6">
         <button

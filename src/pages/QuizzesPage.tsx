@@ -25,9 +25,10 @@ export default function QuizzesPage() {
   const [quizStartTime, setQuizStartTime] = useState<number | null>(null);
 
   // Data state
-  const [quizzes, setQuizzes] = useState<Quiz[]>(mockQuizzes);
-  const [loading, setLoading] = useState(false);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Security state
   const [tabViolation, setTabViolation] = useState(false);
@@ -35,14 +36,17 @@ export default function QuizzesPage() {
 
   // Handle URL-based quiz selection
   useEffect(() => {
-    if (id) {
+    if (dataLoaded && id) {
       const quiz = quizzes.find(q => q.id === id);
       if (quiz) {
         setSelectedQuiz(quiz);
         setShowPreQuizScreen(true);
+      } else {
+        setSelectedQuiz(null);
+        setShowPreQuizScreen(false);
       }
     }
-  }, [id, quizzes]);
+  }, [id, quizzes, dataLoaded]);
 
   // Fetch quizzes from API
   useEffect(() => {
@@ -67,12 +71,16 @@ export default function QuizzesPage() {
           }));
           if (transformed.length > 0) {
             setQuizzes(transformed);
+          } else {
+            setQuizzes(mockQuizzes);
           }
         }
       } catch (error) {
         console.log('Using mock data (API not available)');
+        setQuizzes(mockQuizzes);
       } finally {
         setLoading(false);
+        setDataLoaded(true);
       }
     };
 

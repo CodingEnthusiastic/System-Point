@@ -3,7 +3,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Navbar } from './Navbar';
 
 export function AppLayout() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  // Wait for auth to load before making any decisions
+  if (loading) {
+    return null;
+  }
+
   if (!user) return <Navigate to="/login" replace />;
 
   return (

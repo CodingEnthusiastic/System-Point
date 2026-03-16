@@ -13,8 +13,9 @@ export default function LearnPage() {
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<string>('All');
-  const [courses, setCourses] = useState<Course[]>(initialCourses);
-  const [loading, setLoading] = useState(false);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Fetch courses from API
   useEffect(() => {
@@ -44,12 +45,16 @@ export default function LearnPage() {
           }));
           if (transformed.length > 0) {
             setCourses(transformed);
+          } else {
+            setCourses(initialCourses);
           }
         }
       } catch (error) {
         console.log('Using mock data (API not available)');
+        setCourses(initialCourses);
       } finally {
         setLoading(false);
+        setDataLoaded(true);
       }
     };
 
@@ -58,7 +63,7 @@ export default function LearnPage() {
 
   // Handle URL-based course/lesson selection
   useEffect(() => {
-    if (courseId) {
+    if (dataLoaded && courseId) {
       const course = courses.find(c => c.id === courseId);
       if (course) {
         setSelectedCourse(course);
@@ -66,13 +71,21 @@ export default function LearnPage() {
           const lesson = course.lessons.find(l => l.id === lessonId);
           if (lesson) {
             setActiveLesson(lesson);
+          } else {
+            setActiveLesson(course.lessons[0] || null);
           }
         } else {
           setActiveLesson(course.lessons[0] || null);
         }
+      } else {
+        setSelectedCourse(null);
+        setActiveLesson(null);
       }
+    } else if (!courseId) {
+      setSelectedCourse(null);
+      setActiveLesson(null);
     }
-  }, [courseId, lessonId, courses]);
+  }, [courseId, lessonId, courses, dataLoaded]);
 
   const categories = ['All', 'Fundamentals', 'HLD', 'LLD'];
   const filtered = filter === 'All' ? courses : courses.filter((c) => c.category === filter);
