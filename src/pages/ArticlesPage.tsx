@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { articles as mockArticles, Article } from '@/data/mockData';
 import { ArrowLeft, ChevronLeft, ChevronRight, Calendar, User, Tag } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { getImageUrl } from '@/lib/utils';
 
 function ImageCarousel({ images }: { images: string[] }) {
   const [current, setCurrent] = useState(0);
@@ -9,7 +10,7 @@ function ImageCarousel({ images }: { images: string[] }) {
 
   return (
     <div className="relative aspect-[2/1] bg-black border-3 border-foreground overflow-hidden" style={{ boxShadow: '4px 4px 0px #000' }}>
-      <img src={images[current]} alt="" className="w-full h-full object-cover" />
+      <img src={getImageUrl(images[current])} alt="" className="w-full h-full object-cover" />
       {images.length > 1 && (
         <>
           <button
@@ -153,7 +154,7 @@ export default function ArticlesPage() {
                 {article.images[0] && (
                   <div className="aspect-video overflow-hidden">
                     <img
-                      src={article.images[0]}
+                      src={getImageUrl(article.images[0])}
                       alt={article.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />

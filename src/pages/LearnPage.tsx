@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { courses as initialCourses, Course, Lesson } from '@/data/mockData';
 import { Play, Clock, ChevronRight, ArrowLeft, CheckCircle, BookOpen, Loader } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getImageUrl } from '@/lib/utils';
 
 export default function LearnPage() {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -215,7 +216,7 @@ export default function LearnPage() {
                 <div className="neu-card-blue overflow-hidden">
                   <div className="relative aspect-video overflow-hidden">
                     <img
-                      src={course.thumbnail}
+                      src={getImageUrl(course.thumbnail)}
                       alt={course.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />

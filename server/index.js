@@ -43,7 +43,7 @@ const upload = multer({ storage });
 
 // MongoDB connection
 let db;
-let authCollection, articlesCollection, quizzesCollection, usersCollection, verificationsCollection, leaderboardCollection, coursesCollection;
+let authCollection, articlesCollection, quizzesCollection, usersCollection, verificationsCollection, leaderboardCollection, coursesCollection, courseTrackingCollection;
 
 const connectDB = async () => {
   try {
@@ -58,12 +58,16 @@ const connectDB = async () => {
     usersCollection = db.collection('userProfiles');
     verificationsCollection = db.collection('verifications');
     leaderboardCollection = db.collection('leaderboard');
+    courseTrackingCollection = db.collection('courseTracking');
 
     // Create indexes
     await authCollection.createIndex({ email: 1 }, { unique: true });
     await verificationsCollection.createIndex({ email: 1 });
     await leaderboardCollection.createIndex({ quizId: 1, userId: 1 }, { unique: true });
     await leaderboardCollection.createIndex({ quizId: 1, points: -1 });
+    await courseTrackingCollection.createIndex({ userId: 1, courseId: 1 }, { unique: true });
+    await courseTrackingCollection.createIndex({ userId: 1 });
+    await courseTrackingCollection.createIndex({ courseId: 1 });
     
     console.log('✓ Connected to MongoDB');
   } catch (error) {
@@ -112,6 +116,20 @@ const middleware = {
     
     const decoded = verifyToken(token);
     if (!decoded) return res.status(401).json({ error: 'Invalid token' });
+    
+    req.user = decoded;
+    next();
+  },
+  admin: (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'No token' });
+    
+    const decoded = verifyToken(token);
+    if (!decoded) return res.status(401).json({ error: 'Invalid token' });
+    
+    if (decoded.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
     
     req.user = decoded;
     next();
@@ -664,6 +682,134 @@ app.get('/api/quizzes/:quizId/leaderboard', async (req, res) => {
   } catch (error) {
     console.error('Leaderboard fetch error:', error);
     res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
+});
+
+// COURSE TRACKING ROUTES
+// Track course progress
+app.post('/api/courses/:courseId/track', middleware.auth, async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const { lessonId, isCompleted, timeSpent } = req.body;
+    const userId = req.user._id || req.user.id;
+
+    // Build update object with proper property names
+    const incObj = {};
+    incObj[`lessons.${lessonId}.timeSpent`] = timeSpent || 0;
+    
+    const setObj = {};
+    setObj[`lessons.${lessonId}.completed`] = isCompleted || false;
+    setObj[`lessons.${lessonId}.lastAccessed`] = new Date();
+    if (isCompleted) {
+      setObj[`lessons.${lessonId}.completedAt`] = new Date();
+    }
+
+    // Upsert course tracking
+    const result = await courseTrackingCollection.findOneAndUpdate(
+      { userId: userId.toString(), courseId },
+      {
+        $set: {
+          ...setObj,
+          updatedAt: new Date()
+        },
+        $inc: incObj,
+        $setOnInsert: {
+          userId: userId.toString(),
+          courseId,
+          startedAt: new Date()
+        }
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
+
+    res.json({ message: 'Course progress tracked', tracking: result.value });
+  } catch (error) {
+    console.error('Course tracking error:', error);
+    res.status(500).json({ error: 'Failed to track course progress' });
+  }
+});
+
+// Get user course progress
+app.get('/api/courses/:courseId/progress', middleware.auth, async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const userId = req.user._id || req.user.id;
+
+    const progress = await courseTrackingCollection.findOne({
+      userId: userId.toString(),
+      courseId
+    });
+
+    if (!progress) {
+      return res.json({
+        userId: userId.toString(),
+        courseId,
+        lessons: {},
+        startedAt: null,
+        completionPercentage: 0
+      });
+    }
+
+    res.json(progress);
+  } catch (error) {
+    console.error('Course progress fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch course progress' });
+  }
+});
+
+// Get user's all course progress
+app.get('/api/user/courses/progress', middleware.auth, async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+
+    const allProgress = await courseTrackingCollection
+      .find({ userId: userId.toString() })
+      .toArray();
+
+    res.json(allProgress);
+  } catch (error) {
+    console.error('User courses progress fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch user course progress' });
+  }
+});
+
+// ========== USERS MANAGEMENT ==========
+// Get all users (admin only)
+app.get('/api/users', middleware.admin, async (req, res) => {
+  try {
+    const users = await authCollection.find({}).toArray();
+    res.json(users.map(u => ({
+      _id: u._id,
+      username: u.username,
+      email: u.email,
+      role: u.role || 'user',
+      createdAt: u.createdAt
+    })));
+  } catch (error) {
+    console.error('Failed to fetch users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// Delete user (admin only)
+app.delete('/api/users/:id', middleware.admin, async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    if (!ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    const result = await authCollection.deleteOne({ _id: new ObjectId(userId) });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Failed to delete user:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
   }
 });
 

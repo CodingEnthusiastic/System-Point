@@ -5,7 +5,8 @@ import { Course, Article, Quiz, Lesson, QuizQuestion } from '@/data/mockData';
 import { Plus, Trash2, Edit3, BookOpen, FileText, Brain, Users, X, Save, Loader, Upload } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { RichTextEditor } from '@/components/RichTextEditor';
-import { articlesAPI, quizzesAPI, coursesAPI, uploadAPI } from '@/lib/api';
+import { articlesAPI, quizzesAPI, coursesAPI, uploadAPI, usersAPI } from '@/lib/api';
+import { getImageUrl } from '@/lib/utils';
 
 type Tab = 'courses' | 'articles' | 'quizzes' | 'users';
 
@@ -17,6 +18,7 @@ export default function AdminPage() {
   const [coursesList, setCoursesList] = useState<Course[]>([]);
   const [articlesList, setArticlesList] = useState<Article[]>([]);
   const [quizzesList, setQuizzesList] = useState<Quiz[]>([]);
+  const [usersList, setUsersList] = useState<any[]>([]);
 
   // Article editor state
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
@@ -32,7 +34,9 @@ export default function AdminPage() {
 
   // Quiz editor state
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
-  const [quizForm, setQuizForm] = useState({ title: '', topic: '', questions: '' });
+  const [quizForm, setQuizForm] = useState({ title: '', topic: '', questions: [] as QuizQuestion[] });
+  const [editingQuestionIndex, setEditingQuestionIndex] = useState<number | null>(null);
+  const [questionForm, setQuestionForm] = useState({ question: '', options: ['', '', '', ''], correctAnswer: 0 });
 
   if (!isAdmin) return <Navigate to="/" replace />;
 
@@ -89,6 +93,22 @@ export default function AdminPage() {
       } catch (error) {
         console.error('Failed to load quizzes:', error);
         setQuizzesList([]);
+      }
+
+      try {
+        // Load users from DB
+        const usersRes = await usersAPI.getAll();
+        const transformedUsers = usersRes.data.map((u: any) => ({
+          id: u._id,
+          username: u.username,
+          email: u.email,
+          role: u.role || 'user',
+          createdAt: u.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+        }));
+        setUsersList(transformedUsers);
+      } catch (error) {
+        console.error('Failed to load users:', error);
+        setUsersList([]);
       }
     };
 
@@ -324,12 +344,14 @@ export default function AdminPage() {
       setQuizForm({
         title: quiz.title,
         topic: quiz.topic,
-        questions: quiz.questions.length.toString(),
+        questions: quiz.questions || [],
       });
     } else {
       setEditingQuiz({ id: '', title: '', topic: '', questions: [] });
-      setQuizForm({ title: '', topic: '', questions: '' });
+      setQuizForm({ title: '', topic: '', questions: [] });
     }
+    setEditingQuestionIndex(null);
+    setQuestionForm({ question: '', options: ['', '', '', ''], correctAnswer: 0 });
   };
 
   const saveQuiz = async () => {
@@ -338,12 +360,17 @@ export default function AdminPage() {
       return;
     }
 
+    if (quizForm.questions.length === 0) {
+      alert('Add at least one question');
+      return;
+    }
+
     const quiz: Quiz = {
       ...editingQuiz,
       id: editingQuiz.id || String(Date.now()),
       title: quizForm.title,
       topic: quizForm.topic,
-      questions: editingQuiz.questions,
+      questions: quizForm.questions,
     };
 
     try {
@@ -365,10 +392,47 @@ export default function AdminPage() {
         setQuizzesList((p) => [...p, { ...quiz, id: response.data._id }]);
       }
       setEditingQuiz(null);
+      setQuizForm({ title: '', topic: '', questions: [] });
+      setEditingQuestionIndex(null);
     } catch (error) {
       console.error('Failed to save quiz:', error);
       alert('Failed to save quiz');
     }
+  };
+
+  const addQuestion = () => {
+    const newQuestion: QuizQuestion = {
+      id: String(Date.now()),
+      question: questionForm.question,
+      options: questionForm.options.filter(o => o.trim() !== ''),
+      correctAnswer: questionForm.correctAnswer,
+    };
+
+    if (editingQuestionIndex !== null) {
+      // Update existing question
+      const updated = [...quizForm.questions];
+      updated[editingQuestionIndex] = newQuestion;
+      setQuizForm((p) => ({ ...p, questions: updated }));
+      setEditingQuestionIndex(null);
+    } else {
+      // Add new question
+      setQuizForm((p) => ({ ...p, questions: [...p.questions, newQuestion] }));
+    }
+    setQuestionForm({ question: '', options: ['', '', '', ''], correctAnswer: 0 });
+  };
+
+  const removeQuestion = (index: number) => {
+    setQuizForm((p) => ({ ...p, questions: p.questions.filter((_, i) => i !== index) }));
+  };
+
+  const editQuestion = (index: number) => {
+    const q = quizForm.questions[index];
+    setQuestionForm({
+      question: q.question,
+      options: q.options,
+      correctAnswer: q.correctAnswer,
+    });
+    setEditingQuestionIndex(index);
   };
 
   return (
@@ -465,7 +529,7 @@ export default function AdminPage() {
                   <div className="grid grid-cols-2 gap-3">
                     {articleForm.images.map((img, idx) => (
                       <div key={idx} className="relative">
-                        <img src={img} alt={`Article ${idx}`} className="w-full h-24 object-cover border-3 border-border" />
+                        <img src={getImageUrl(img)} alt={`Article ${idx}`} className="w-full h-24 object-cover border-3 border-border" />
                         <button
                           onClick={() => removeArticleImage(idx)}
                           className="absolute top-1 right-1 bg-red-600 text-white p-1 border border-white cursor-pointer hover:bg-red-700"
@@ -697,18 +761,19 @@ export default function AdminPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="neu-card-blue p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+            className="neu-card-blue p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold uppercase tracking-wider">
                 {editingQuiz.id ? 'Edit Quiz' : 'New Quiz'}
               </h3>
-              <button onClick={() => setEditingQuiz(null)} className="p-2 hover:bg-secondary cursor-pointer">
+              <button onClick={() => { setEditingQuiz(null); setQuizForm({ title: '', topic: '', questions: [] }); }} className="p-2 hover:bg-secondary cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-4">
+            {/* Quiz Basic Info */}
+            <div className="space-y-4 mb-6">
               <div>
                 <label className="block text-sm font-bold uppercase tracking-wider mb-2">Title</label>
                 <input
@@ -725,22 +790,114 @@ export default function AdminPage() {
                   className="neu-input w-full px-4 py-3 text-foreground"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-bold uppercase tracking-wider mb-2">Number of Questions</label>
-                <input
-                  type="number"
-                  value={quizForm.questions}
-                  onChange={(e) => setQuizForm((p) => ({ ...p, questions: e.target.value }))}
-                  className="neu-input w-full px-4 py-3 text-foreground"
-                />
-              </div>
             </div>
 
-            <div className="flex gap-3 pt-6">
+            {/* Questions Section */}
+            <div className="border-t border-primary/20 pt-6">
+              <h4 className="font-bold uppercase tracking-wider mb-4">Questions ({quizForm.questions.length})</h4>
+
+              {/* Question Editor */}
+              <div className="neu-card p-4 mb-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-bold uppercase tracking-wider mb-2">Question Text</label>
+                    <textarea
+                      value={questionForm.question}
+                      onChange={(e) => setQuestionForm((p) => ({ ...p, question: e.target.value }))}
+                      className="neu-input w-full px-4 py-3 text-foreground min-h-20"
+                      placeholder="Enter question text"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold uppercase tracking-wider mb-2">Options</label>
+                    <div className="space-y-2">
+                      {questionForm.options.map((option, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <span className="text-sm font-bold">
+                            {String.fromCharCode(65 + idx)}.
+                          </span>
+                          <input
+                            value={option}
+                            onChange={(e) => {
+                              const updated = [...questionForm.options];
+                              updated[idx] = e.target.value;
+                              setQuestionForm((p) => ({ ...p, options: updated }));
+                            }}
+                            className="neu-input flex-1 px-4 py-2 text-foreground"
+                            placeholder={`Option ${String.fromCharCode(65 + idx)}`}
+                          />
+                          <input
+                            type="radio"
+                            name="correctAnswer"
+                            checked={questionForm.correctAnswer === idx}
+                            onChange={() => setQuestionForm((p) => ({ ...p, correctAnswer: idx }))}
+                            className="cursor-pointer"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={addQuestion}
+                      disabled={!questionForm.question || questionForm.options.filter(o => o.trim()).length < 2}
+                      className="neu-btn-blue px-4 py-2 text-sm disabled:opacity-50 cursor-pointer"
+                    >
+                      {editingQuestionIndex !== null ? 'Update Question' : 'Add Question'}
+                    </button>
+                    {editingQuestionIndex !== null && (
+                      <button
+                        onClick={() => {
+                          setEditingQuestionIndex(null);
+                          setQuestionForm({ question: '', options: ['', '', '', ''], correctAnswer: 0 });
+                        }}
+                        className="neu-btn px-4 py-2 text-sm cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Questions List */}
+              {quizForm.questions.length > 0 && (
+                <div className="space-y-2 mb-6">
+                  {quizForm.questions.map((q, idx) => (
+                    <div key={q.id} className="neu-card p-3 flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm font-bold">Q{idx + 1}: {q.question}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Options: {q.options.length} | Correct: {String.fromCharCode(65 + q.correctAnswer)}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 ml-4">
+                        <button
+                          onClick={() => editQuestion(idx)}
+                          className="p-2 hover:bg-secondary cursor-pointer"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => removeQuestion(idx)}
+                          className="p-2 hover:bg-destructive/10 cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 pt-6 border-t border-primary/20">
               <button onClick={saveQuiz} className="neu-btn-blue px-6 py-3 inline-flex items-center gap-2 cursor-pointer">
                 <Save className="w-4 h-4" /> Save Quiz
               </button>
-              <button onClick={() => setEditingQuiz(null)} className="neu-btn px-6 py-3 bg-secondary text-foreground cursor-pointer">
+              <button onClick={() => { setEditingQuiz(null); setQuizForm({ title: '', topic: '', questions: [] }); }} className="neu-btn px-6 py-3 bg-secondary text-foreground cursor-pointer">
                 Cancel
               </button>
             </div>
@@ -760,7 +917,7 @@ export default function AdminPage() {
             </div>
             {coursesList.map((course) => (
               <div key={course.id} className="neu-card p-5 flex items-center gap-4">
-                <img src={course.thumbnail} alt="" className="w-20 h-14 object-cover border-2 border-foreground shrink-0" />
+                <img src={getImageUrl(course.thumbnail)} alt="" className="w-20 h-14 object-cover border-2 border-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
                   <h4 className="font-bold truncate">{course.title}</h4>
                   <p className="text-sm text-muted-foreground font-mono">{course.lessons.length} lessons · {course.category} · {course.difficulty}</p>
@@ -788,7 +945,7 @@ export default function AdminPage() {
             </div>
             {articlesList.map((article) => (
               <div key={article.id} className="neu-card p-5 flex items-center gap-4">
-                {article.images[0] && <img src={article.images[0]} alt="" className="w-20 h-14 object-cover border-2 border-foreground shrink-0" />}
+                {article.images[0] && <img src={getImageUrl(article.images[0])} alt="" className="w-20 h-14 object-cover border-2 border-foreground shrink-0" />}
                 <div className="flex-1 min-w-0">
                   <h4 className="font-bold truncate">{article.title}</h4>
                   <p className="text-sm text-muted-foreground font-mono">{article.tags.join(', ')}</p>
@@ -838,26 +995,52 @@ export default function AdminPage() {
 
         {activeTab === 'users' && (
           <div className="space-y-4">
-            <h3 className="text-lg font-bold uppercase tracking-wider">2 Users</h3>
-            {[
-              { name: 'Admin User', email: 'admin@systemdesign.com', role: 'admin' },
-              { name: 'John Learner', email: 'user@systemdesign.com', role: 'user' },
-            ].map((u) => (
-              <div key={u.email} className="neu-card p-5 flex items-center gap-4">
-                <div className="w-12 h-12 bg-primary border-2 border-foreground flex items-center justify-center shrink-0" style={{ boxShadow: '2px 2px 0px #000' }}>
-                  <span className="text-primary-foreground font-bold">{u.name[0]}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-bold">{u.name}</h4>
-                  <p className="text-sm text-muted-foreground font-mono">{u.email}</p>
-                </div>
-                <span className={`px-3 py-1 text-xs font-bold uppercase tracking-wider border-2 ${
-                  u.role === 'admin' ? 'bg-primary text-primary-foreground border-primary' : 'bg-accent-cyan text-background border-accent-cyan'
-                }`} style={{ boxShadow: '2px 2px 0px #000' }}>
-                  {u.role}
-                </span>
+            <h3 className="text-lg font-bold uppercase tracking-wider">{usersList.length} Users</h3>
+            {usersList.length === 0 ? (
+              <div className="neu-card p-8 text-center text-muted-foreground">
+                No users found
               </div>
-            ))}
+            ) : (
+              usersList.map((u) => (
+                <div key={u.id} className="neu-card p-5 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="w-12 h-12 bg-primary border-2 border-foreground flex items-center justify-center shrink-0" style={{ boxShadow: '2px 2px 0px #000' }}>
+                      <span className="text-primary-foreground font-bold">{u.username[0]?.toUpperCase() || u.email[0]?.toUpperCase()}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold">{u.username}</h4>
+                      <p className="text-sm text-muted-foreground font-mono">{u.email}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Joined: {u.createdAt}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 text-xs font-bold uppercase tracking-wider border-2 ${
+                      u.role === 'admin' ? 'bg-primary text-primary-foreground border-primary' : 'bg-accent-cyan text-background border-accent-cyan'
+                    }`} style={{ boxShadow: '2px 2px 0px #000' }}>
+                      {u.role}
+                    </span>
+                    {u.role !== 'admin' && (
+                      <button
+                        onClick={async () => {
+                          if (window.confirm(`Delete user ${u.username}?`)) {
+                            try {
+                              await usersAPI.delete(u.id);
+                              setUsersList((p) => p.filter((user) => user.id !== u.id));
+                            } catch (error) {
+                              console.error('Failed to delete user:', error);
+                              alert('Failed to delete user');
+                            }
+                          }
+                        }}
+                        className="p-2 hover:bg-destructive/10 cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         )}
       </motion.div>

@@ -61,6 +61,13 @@ export const quizzesAPI = {
     api.get(`/api/quizzes/${quizId}/leaderboard`),
 };
 
+// Users APIs
+export const usersAPI = {
+  getAll: () => api.get('/api/users'),
+  getById: (id: string) => api.get(`/api/users/${id}`),
+  delete: (id: string) => api.delete(`/api/users/${id}`),
+};
+
 // Upload APIs
 export const uploadAPI = {
   uploadFile: (file: File) => {
