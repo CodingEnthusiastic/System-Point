@@ -289,7 +289,7 @@ export default function LeaderboardPage() {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.03 }}
-                      className={`neu-card p-5 flex items-center gap-4 transition-all hover:scale-102 ${
+                      className={`neu-card p-3 flex items-center gap-3 transition-all hover:scale-102 ${
                         isTopThree
                           ? 'border-3 border-accent-yellow bg-accent-yellow/5'
                           : 'hover:border-primary'
@@ -302,7 +302,7 @@ export default function LeaderboardPage() {
                     >
                       {/* Rank */}
                       <div
-                        className={`w-14 h-14 flex-shrink-0 flex items-center justify-center text-2xl font-bold border-3 ${
+                        className={`w-12 h-12 flex-shrink-0 flex items-center justify-center text-xl font-bold border-3 ${
                           isTopThree
                             ? 'bg-accent-yellow/20 border-accent-yellow'
                             : 'bg-secondary border-foreground'
@@ -318,35 +318,35 @@ export default function LeaderboardPage() {
 
                       {/* User Info */}
                       <div className="flex-grow min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-bold text-lg truncate">{entry.username}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-base truncate">{entry.username}</p>
                           {isTopThree && (
-                            <span className="px-2 py-1 text-xs font-bold bg-accent-yellow text-black rounded">
+                            <span className="px-2 py-0.5 text-xs font-bold bg-accent-yellow text-black rounded">
                               TOP {entry.rank}
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground font-mono">
+                        <p className="text-xs text-muted-foreground font-mono leading-tight">
                           <Calendar className="w-3 h-3 inline mr-1" />
                           {formatDate(entry.completedAt)}
                         </p>
                       </div>
 
                       {/* Score */}
-                      <div className="flex flex-col items-end gap-2">
-                        <div className="px-4 py-2 bg-accent-lime/20 border-2 border-accent-lime rounded-lg">
-                          <p className="text-xs text-muted-foreground font-mono mb-1">
+                      <div className="flex flex-col items-end gap-1.5">
+                        <div className="px-3 py-1.5 bg-accent-lime/20 border-2 border-accent-lime rounded-lg">
+                          <p className="text-xs text-muted-foreground font-mono">
                             SCORE
                           </p>
-                          <p className="text-2xl font-bold text-accent-lime">
+                          <p className="text-lg font-bold text-accent-lime">
                             {entry.points}%
                           </p>
                         </div>
-                        <div className="px-4 py-2 bg-accent-cyan/20 border-2 border-accent-cyan rounded-lg">
-                          <p className="text-xs text-muted-foreground font-mono mb-1">
+                        <div className="px-3 py-1.5 bg-accent-cyan/20 border-2 border-accent-cyan rounded-lg">
+                          <p className="text-xs text-muted-foreground font-mono">
                             TIME
                           </p>
-                          <p className="text-sm font-bold text-accent-cyan">
+                          <p className="text-xs font-bold text-accent-cyan">
                             {formatTime(entry.timeSpent)}
                           </p>
                         </div>
