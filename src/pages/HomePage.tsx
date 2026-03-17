@@ -3,9 +3,60 @@ import { useAuth } from '@/contexts/AuthContext';
 import { BookOpen, FileText, Brain, ArrowRight, Server, Database, Globe, Layers, Cpu, Network } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PageLoader from '@/components/PageLoader';
+import { useState, useEffect } from 'react';
 
 export default function HomePage() {
   const { user, loading } = useAuth();
+  const [statsData, setStatsData] = useState({
+    courses: 0,
+    lessons: 0,
+    quizzes: 0,
+    articles: 0,
+  });
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // Fetch real data from API
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        
+        const [coursesRes, quizzesRes, articlesRes] = await Promise.all([
+          fetch(`${API_URL}/api/courses`),
+          fetch(`${API_URL}/api/quizzes`),
+          fetch(`${API_URL}/api/articles`),
+        ]);
+
+        const coursesData = coursesRes.ok ? await coursesRes.json() : [];
+        const quizzesData = quizzesRes.ok ? await quizzesRes.json() : [];
+        const articlesData = articlesRes.ok ? await articlesRes.json() : [];
+
+        // Calculate lessons count
+        const lessonsCount = coursesData.reduce((total: number, course: any) => {
+          return total + (course.lessons?.length || 0);
+        }, 0);
+
+        setStatsData({
+          courses: coursesData.length,
+          lessons: lessonsCount,
+          quizzes: quizzesData.length,
+          articles: articlesData.length,
+        });
+      } catch (error) {
+        // Use defaults on error
+        setStatsData({
+          courses: 0,
+          lessons: 0,
+          quizzes: 0,
+          articles: 0,
+        });
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const features = [
     { icon: BookOpen, title: 'Learn', desc: 'Curated video courses on HLD & LLD', to: '/learn', color: 'bg-primary' },
@@ -14,10 +65,10 @@ export default function HomePage() {
   ];
 
   const stats = [
-    { value: '5+', label: 'Courses' },
-    { value: '15+', label: 'Lessons' },
-    { value: '3+', label: 'Quizzes' },
-    { value: '3+', label: 'Articles' },
+    { value: statsData.courses, label: 'Courses' },
+    { value: statsData.lessons, label: 'Lessons' },
+    { value: statsData.quizzes, label: 'Quizzes' },
+    { value: statsData.articles, label: 'Articles' },
   ];
 
   const topics = [
