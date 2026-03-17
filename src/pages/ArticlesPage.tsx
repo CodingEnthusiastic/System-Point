@@ -4,6 +4,7 @@ import { articles as mockArticles, Article } from '@/data/mockData';
 import { ArrowLeft, ChevronLeft, ChevronRight, Calendar, User, Tag, Search, Grid3x3, List } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getImageUrl } from '@/lib/utils';
+import PageLoader from '@/components/PageLoader';
 
 function ImageCarousel({ images }: { images: string[] }) {
   const [current, setCurrent] = useState(0);
@@ -49,6 +50,8 @@ export default function ArticlesPage() {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingImages, setLoadingImages] = useState(false);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -59,7 +62,15 @@ export default function ArticlesPage() {
     if (dataLoaded && id) {
       const article = articles.find(a => a.id === id);
       if (article) {
-        setSelectedArticle(article);
+        // Preload images before showing article
+        if (article.images && article.images.length > 0) {
+          setLoadingImages(true);
+          setImagesLoaded(false);
+          preloadImages(article.images);
+        } else {
+          setImagesLoaded(true);
+          setSelectedArticle(article);
+        }
       } else {
         // Article not found, go back to list
         setSelectedArticle(null);
@@ -68,6 +79,29 @@ export default function ArticlesPage() {
       setSelectedArticle(null);
     }
   }, [id, articles, dataLoaded]);
+
+  // Preload all images before displaying article
+  const preloadImages = async (imageUrls: string[]) => {
+    try {
+      const promises = imageUrls.map(url => {
+        return new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve();
+          img.onerror = () => resolve(); // Still resolve on error
+          img.src = getImageUrl(url);
+        });
+      });
+      
+      await Promise.all(promises);
+      setImagesLoaded(true);
+      setSelectedArticle(articles.find(a => a.id === id) || null);
+    } catch (error) {
+      setImagesLoaded(true);
+      setSelectedArticle(articles.find(a => a.id === id) || null);
+    } finally {
+      setLoadingImages(false);
+    }
+  };
 
   // Fetch articles from API
   useEffect(() => {
@@ -314,6 +348,7 @@ export default function ArticlesPage() {
           </div>
         </div>
       )}
+      <PageLoader isLoading={loading || loadingImages} message={loadingImages ? 'Loading articles...' : 'Fetching articles...'} />
     </div>
   );
 }

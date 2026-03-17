@@ -2,9 +2,10 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { BookOpen, FileText, Brain, ArrowRight, Server, Database, Globe, Layers, Cpu, Network } from 'lucide-react';
 import { motion } from 'framer-motion';
+import PageLoader from '@/components/PageLoader';
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
   const features = [
     { icon: BookOpen, title: 'Learn', desc: 'Curated video courses on HLD & LLD', to: '/learn', color: 'bg-primary' },
@@ -131,6 +132,7 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+      <PageLoader isLoading={loading} message="Loading..." />
     </div>
   );
 }

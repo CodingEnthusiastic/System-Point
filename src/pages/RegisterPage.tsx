@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertCircle, Check, Loader } from 'lucide-react';
+import { authAPI } from '@/lib/api';
+import PageLoader from '@/components/PageLoader';
 
 export default function RegisterPage() {
   const { user } = useAuth();
@@ -22,8 +24,6 @@ export default function RegisterPage() {
   });
 
   if (user) return <Navigate to="/" replace />;
-
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,27 +47,17 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
-        }),
-      });
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      await authAPI.register(formData.username, formData.email, formData.password);
+      clearTimeout(timeoutId);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'Registration failed');
-        return;
-      }
-
-      setSuccess('Verification code sent to your email!');
+      setSuccess('✓ Verification code sent to your email!');
       setStep('verify');
-    } catch (err) {
-      setError('Registration failed. Please try again.');
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -90,22 +80,14 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: formData.email,
-          code: verifyData.code,
-        }),
-      });
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-      const data = await response.json();
+      const response = await authAPI.verify(formData.email, verifyData.code);
+      clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        setError(data.error || 'Verification failed');
-        return;
-      }
-
+      const data = response.data;
       localStorage.setItem('authToken', data.token);
       localStorage.setItem('userData', JSON.stringify(data.user));
       
@@ -113,8 +95,8 @@ export default function RegisterPage() {
       setTimeout(() => {
         window.location.href = '/';
       }, 1500);
-    } catch (err) {
-      setError('Verification failed. Please try again.');
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Verification failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -290,6 +272,7 @@ export default function RegisterPage() {
           )}
         </div>
       </div>
+      <PageLoader isLoading={loading} message={step === 'register' ? 'Creating account...' : 'Verifying code...'} />
     </div>
   );
 }

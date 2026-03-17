@@ -8,6 +8,7 @@ import QuizActiveScreen from '@/components/quiz/QuizActiveScreen';
 import QuizResultsScreen from '@/components/quiz/QuizResultsScreen';
 import QuizReviewScreen from '@/components/quiz/QuizReviewScreen';
 import QuizzesListScreen from '@/components/quiz/QuizzesListScreen';
+import PageLoader from '@/components/PageLoader';
 
 export default function QuizzesPage() {
   const { id } = useParams<{ id?: string }>();
@@ -434,9 +435,12 @@ export default function QuizzesPage() {
   }
 
   return (
-    <QuizzesListScreen
-      quizzes={quizzes}
-      onSelectQuiz={handleSelectQuiz}
-    />
+    <>
+      <QuizzesListScreen
+        quizzes={quizzes}
+        onSelectQuiz={handleSelectQuiz}
+      />
+      <PageLoader isLoading={loading || submitting} message={submitting ? 'Submitting quiz...' : 'Loading quizzes...'} />
+    </>
   );
 }

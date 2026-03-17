@@ -4,6 +4,7 @@ import { courses as initialCourses, Course, Lesson } from '@/data/mockData';
 import { Play, Clock, ChevronRight, ArrowLeft, CheckCircle, BookOpen, Loader } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getImageUrl } from '@/lib/utils';
+import PageLoader from '@/components/PageLoader';
 
 export default function LearnPage() {
   const { courseId, lessonId } = useParams<{ courseId?: string; lessonId?: string }>();
@@ -289,6 +290,7 @@ export default function LearnPage() {
         </AnimatePresence>
       </div>
       )}
+      <PageLoader isLoading={loading} message="Loading courses..." />
     </div>
   );
 }
