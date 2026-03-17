@@ -1,5 +1,6 @@
-import { ArrowLeft, CheckCircle, XCircle, Trophy, Calendar } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Trophy, Calendar, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { Quiz } from '@/data/mockData';
 import { getImageUrl } from '@/lib/utils';
 
@@ -20,6 +21,7 @@ export default function QuizReviewScreen({
   completedAt,
   onBack,
 }: QuizReviewScreenProps) {
+  const navigate = useNavigate();
   const correct = quiz.questions.filter((q) => userAnswers[q.id] === q.correctAnswer).length;
   const total = quiz.questions.length;
 
@@ -34,12 +36,21 @@ export default function QuizReviewScreen({
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-4xl mx-auto space-y-6">
-      <button
-        onClick={onBack}
-        className="neu-btn px-4 py-2 bg-secondary text-foreground inline-flex items-center gap-2 text-sm cursor-pointer"
-      >
-        <ArrowLeft className="w-4 h-4" /> Back to Quizzes
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={onBack}
+          className="neu-btn px-4 py-2 bg-secondary text-foreground inline-flex items-center gap-2 text-sm cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to Quizzes
+        </button>
+        <button
+          onClick={() => navigate(`/leaderboard/${quiz.id}`)}
+          className="neu-btn px-4 py-2 bg-accent-yellow text-black inline-flex items-center gap-2 text-sm cursor-pointer font-bold"
+          style={{ boxShadow: '2px 2px 0px #B8860B' }}
+        >
+          <Trophy className="w-4 h-4" /> Full Leaderboard <ExternalLink className="w-3 h-3" />
+        </button>
+      </div>
 
       {/* Score Summary */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="neu-card-blue p-8 text-center space-y-4">

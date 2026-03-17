@@ -9,6 +9,7 @@ import ArticlesPage from '@/pages/ArticlesPage';
 import QuizzesPage from '@/pages/QuizzesPage';
 import ProfilePage from '@/pages/ProfilePage';
 import AdminPage from '@/pages/AdminPage';
+import LeaderboardPage from '@/pages/LeaderboardPage';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="/articles/:id" element={<ArticlesPage />} />
             <Route path="/quizzes" element={<QuizzesPage />} />
             <Route path="/quizzes/:id" element={<QuizzesPage />} />
+            <Route path="/leaderboard/:id" element={<LeaderboardPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/admin" element={<AdminPage />} />
           </Route>
