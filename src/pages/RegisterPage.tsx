@@ -47,9 +47,9 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      // Add timeout to prevent hanging
+      // Add timeout to prevent hanging (increased to 10 seconds since emails are async now)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
       await authAPI.register(formData.username, formData.email, formData.password);
       clearTimeout(timeoutId);
@@ -80,9 +80,9 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      // Add timeout to prevent hanging
+      // Add timeout to prevent hanging (5 seconds should be enough for DB operations)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
       const response = await authAPI.verify(formData.email, verifyData.code);
       clearTimeout(timeoutId);

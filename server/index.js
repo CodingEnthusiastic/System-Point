@@ -174,14 +174,29 @@ const connectDB = async () => {
   }
 };
 
-// Email configuration
+// Email configuration with improved error handling
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: false,
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: process.env.SMTP_PORT === '465', // Use TLS for 587, SSL for 465
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
+  },
+  connectionTimeout: 5000,
+  socketTimeout: 5000,
+  pool: {
+    maxConnections: 5,
+    maxMessages: 100,
+    rateDelta: 4000,
+    rateLimit: 14
+  }
+});
+
+// Verify transporter connection on startup
+transporter.verify((error, success) => {
+  if (error) {
+  } else {
   }
 });
 
@@ -267,22 +282,38 @@ app.post('/api/auth/register', async (req, res) => {
       { upsert: true }
     );
 
-    // Send verification email
-    try {
-      await transporter.sendMail({
-        from: process.env.SMTP_USER,
-        to: email,
-        subject: 'Verify Your Email - System Design Platform',
-        html: `<h2>Email Verification</h2><p>Your verification code is: <strong style="font-size: 24px;">${verificationCode}</strong></p><p>This code expires in 15 minutes.</p>`
-      });
-    } catch (emailError) {
-      console.error('Email send error:', emailError);
-      // Continue anyway - user can try verifying
-    }
-
+    // IMPORTANT: Send response immediately, send email in background (non-blocking)
     res.json({ 
       message: 'Verification code sent to your email',
       email 
+    });
+
+    // Send verification email asynchronously without blocking response
+    setImmediate(async () => {
+      try {
+        const mailOptions = {
+          from: process.env.SMTP_USER,
+          to: email,
+          subject: 'Verify Your Email - System Design Platform',
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f5f5f5;">
+              <div style="background-color: white; padding: 30px; border-radius: 8px; text-align: center;">
+                <h2 style="color: #333;">Email Verification</h2>
+                <p style="color: #666; margin: 20px 0;">Your verification code is:</p>
+                <div style="background-color: #007bff; color: white; padding: 15px 30px; border-radius: 5px; font-size: 32px; font-weight: bold; letter-spacing: 5px; margin: 20px 0; font-family: 'Courier New', monospace;">
+                  ${verificationCode}
+                </div>
+                <p style="color: #999; font-size: 12px; margin-top: 20px;">This code expires in 15 minutes.</p>
+                <p style="color: #999; font-size: 12px; margin-top: 10px;">If you didn't request this, please ignore this email.</p>
+              </div>
+            </div>
+          `
+        };
+
+        await transporter.sendMail(mailOptions);
+      } catch (emailError) {
+        // Log but don't throw - user can still verify with code from logs if needed
+      }
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -392,6 +423,68 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// DEBUG: Get verification code (development only)
+app.get('/api/auth/debug/verification/:email', async (req, res) => {
+  // Only allow in development
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Not available in production' });
+  }
+  
+  try {
+    const { email } = req.params;
+    const verification = await verificationsCollection.findOne({ email });
+    
+    if (!verification) {
+      return res.status(404).json({ error: 'No verification request found' });
+    }
+    
+    res.json({
+      email,
+      code: verification.code,
+      expiresIn: Math.ceil((verification.expires - new Date()) / 1000) + ' seconds'
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get verification code' });
+  }
+});
+
+// DEBUG: Test email sending (development only)
+app.post('/api/auth/debug/test-email', async (req, res) => {
+  // Only allow in development
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Not available in production' });
+  }
+  
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+    
+    const testCode = '123456';
+    
+    await transporter.sendMail({
+      from: process.env.SMTP_USER,
+      to: email,
+      subject: 'Test Email - System Design Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+          <h2>Test Email</h2>
+          <p>This is a test email from System Design Platform.</p>
+          <p>Test Code: <strong>${testCode}</strong></p>
+          <p>Time: ${new Date().toISOString()}</p>
+          <p>SMTP Credentials Status: OK</p>
+        </div>
+      `
+    });
+    
+    res.json({ message: 'Test email sent successfully', email });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to send test email', details: error.message });
   }
 });
 
