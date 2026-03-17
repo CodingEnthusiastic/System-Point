@@ -1,5 +1,6 @@
-import { Brain, Search } from 'lucide-react';
+import { Brain, Search, Trophy } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { Quiz } from '@/data/mockData';
 import { useState } from 'react';
 
@@ -9,6 +10,7 @@ interface QuizzesListScreenProps {
 }
 
 export default function QuizzesListScreen({ quizzes, onSelectQuiz }: QuizzesListScreenProps) {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   return (
@@ -84,22 +86,47 @@ export default function QuizzesListScreen({ quizzes, onSelectQuiz }: QuizzesList
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: i * 0.1 }}
+            className="flex flex-col h-full"
           >
-            <button
-              onClick={() => onSelectQuiz(quiz)}
-              className="w-full text-left group cursor-pointer h-full"
-            >
-              <div className="neu-card-blue p-6 h-full flex flex-col">
-                <div className="w-12 h-12 bg-accent-indigo border-3 border-foreground flex items-center justify-center mb-4 shrink-0" style={{ boxShadow: '3px 3px 0px #000' }}>
-                  <Brain className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors line-clamp-2">{quiz.title}</h3>
-                <div className="flex items-center justify-between text-sm text-muted-foreground font-mono mt-auto">
-                  <span>{quiz.questions.length} questions</span>
-                  <span className="neu-badge px-3 py-1 bg-secondary text-foreground">{quiz.topic}</span>
-                </div>
+            <div className="neu-card-blue p-6 h-full flex flex-col">
+              <div className="w-12 h-12 bg-accent-indigo border-3 border-foreground flex items-center justify-center mb-4 shrink-0" style={{ boxShadow: '3px 3px 0px #000' }}>
+                <Brain className="w-6 h-6 text-white" />
               </div>
-            </button>
+              <h3 className="text-xl font-bold mb-2 line-clamp-2">{quiz.title}</h3>
+              <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                {quiz.questions.length} questions • {quiz.topic}
+              </p>
+              
+              <div className="flex items-center justify-between text-sm text-muted-foreground font-mono mt-auto mb-4 pb-4 border-b border-foreground/30">
+                <span className="bg-secondary px-2 py-1">{quiz.questions.length} Q's</span>
+                <span className="neu-badge px-3 py-1 bg-secondary text-foreground">{quiz.topic}</span>
+              </div>
+
+              {/* Action buttons */}
+              <div className="space-y-2">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => onSelectQuiz(quiz)}
+                  className="w-full neu-btn-blue py-2 text-sm font-bold border-2 cursor-pointer text-center"
+                  style={{ boxShadow: '2px 2px 0px #1e3a5f' }}
+                >
+                  Start Quiz →
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/leaderboard/${quiz.id}`);
+                  }}
+                  className="w-full px-4 py-2 text-sm font-bold border-2 border-accent-yellow bg-accent-yellow/10 text-foreground cursor-pointer text-center transition-all hover:bg-accent-yellow/20 flex items-center justify-center gap-2"
+                  style={{ boxShadow: '2px 2px 0px #B8860B' }}
+                >
+                  <Trophy className="w-4 h-4" /> Leaderboard
+                </motion.button>
+              </div>
+            </div>
           </motion.div>
         ))}
       </div>
