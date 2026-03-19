@@ -416,7 +416,14 @@ export default function ArticlesPage() {
                 onClick={() => navigate(`/articles/${article.id}`)}
                 className="w-full text-left group cursor-pointer h-full"
               >
-                <div className="neu-card overflow-hidden h-full flex flex-col">
+                <div className="neu-card overflow-hidden h-full flex flex-col relative">
+                  {/* Viewed Badge */}
+                  {userInteractions[article.id]?.isRead && (
+                    <div className="absolute top-3 right-3 bg-green-500 text-white px-3 py-1 text-xs font-bold rounded-sm border-2 border-green-600 z-10" style={{ boxShadow: '2px 2px 0px rgba(0,0,0,0.5)' }}>
+                      ✓ Viewed
+                    </div>
+                  )}
+                  
                   {article.images[0] && (
                     <div className="aspect-video overflow-hidden shrink-0">
                       <img
@@ -436,16 +443,6 @@ export default function ArticlesPage() {
                     <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono mt-auto">
                       <span className="flex items-center gap-1"><User className="w-3 h-3" /> {article.author}</span>
                       <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {article.createdAt}</span>
-                    </div>
-                    
-                    {/* Interaction Stats in Grid */}
-                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-foreground/30">
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
-                        <Heart className="w-3 h-3" /> {(article as any).likeCount || 0}
-                      </span>
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
-                        <CheckCircle className="w-3 h-3" /> {(article as any).readCount || 0}
-                      </span>
                     </div>
                   </div>
                 </div>
