@@ -100,6 +100,8 @@ export interface Article {
   author: string;
   createdAt: string;
   tags: string[];
+  likeCount?: number;
+  readCount?: number;
 }
 
 export const articles: Article[] = [

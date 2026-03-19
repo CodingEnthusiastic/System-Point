@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { articles as mockArticles, Article } from '@/data/mockData';
-import { ArrowLeft, ChevronLeft, ChevronRight, Calendar, User, Tag, Search, Grid3x3, List } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Calendar, User, Tag, Search, Grid3x3, List, Heart, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getImageUrl } from '@/lib/utils';
+import { articlesAPI } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import PageLoader from '@/components/PageLoader';
+import { toast } from 'sonner';
 
 function ImageCarousel({ images }: { images: string[] }) {
   const [current, setCurrent] = useState(0);
@@ -47,6 +50,7 @@ function ImageCarousel({ images }: { images: string[] }) {
 export default function ArticlesPage() {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +60,9 @@ export default function ArticlesPage() {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  
+  // User interactions tracking
+  const [userInteractions, setUserInteractions] = useState<Record<string, { isRead: boolean; isLiked: boolean }>>({});
 
   // Handle URL-based article selection
   useEffect(() => {
@@ -121,6 +128,8 @@ export default function ArticlesPage() {
             author: a.author,
             createdAt: a.createdAt.split('T')[0],
             tags: a.tags || [],
+            likeCount: a.likeCount || 0,
+            readCount: a.readCount || 0,
           }));
           setArticles(transformed.length > 0 ? transformed : mockArticles);
         }
@@ -135,6 +144,94 @@ export default function ArticlesPage() {
 
     fetchArticles();
   }, []);
+
+  // Fetch user interactions with articles
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchInteractions = async () => {
+      try {
+        const response = await articlesAPI.getInteractions();
+        setUserInteractions(response.data);
+      } catch (error) {
+        console.log('Could not load user interactions');
+      }
+    };
+
+    fetchInteractions();
+  }, [user?.id]);
+
+  // Handle mark as read - Simplified
+  const handleMarkAsRead = async (articleId: string) => {
+    if (!user?.id) {
+      toast.error('Please login to mark articles as read');
+      return;
+    }
+
+    const currentState = userInteractions[articleId]?.isRead || false;
+    const newState = !currentState;
+
+    try {
+      // Make API call
+      await articlesAPI.markAsRead(articleId, newState);
+
+      // Update state after success
+      setUserInteractions(prev => ({
+        ...prev,
+        [articleId]: { ...prev[articleId], isRead: newState }
+      }));
+
+      setArticles(prev => prev.map(a => 
+        a.id === articleId 
+          ? { 
+              ...a, 
+              readCount: (a.readCount || 0) + (newState ? 1 : -1)
+            }
+          : a
+      ));
+
+      toast.success(newState ? 'Marked as read' : 'Marked as unread');
+    } catch (error) {
+      console.error('Failed to update read status:', error);
+      toast.error('Failed to update read status');
+    }
+  };
+
+  // Handle like/unlike - Simplified
+  const handleLike = async (articleId: string) => {
+    if (!user?.id) {
+      toast.error('Please login to like articles');
+      return;
+    }
+
+    const currentState = userInteractions[articleId]?.isLiked || false;
+    const newState = !currentState;
+
+    try {
+      // Make API call
+      await articlesAPI.like(articleId, newState);
+
+      // Update state after success
+      setUserInteractions(prev => ({
+        ...prev,
+        [articleId]: { ...prev[articleId], isLiked: newState }
+      }));
+
+      setArticles(prev => prev.map(a => 
+        a.id === articleId 
+          ? { 
+              ...a, 
+              likeCount: (a.likeCount || 0) + (newState ? 1 : -1)
+            }
+          : a
+      ));
+
+      toast.success(newState ? '❤️ Article liked' : 'Like removed');
+    } catch (error) {
+      console.error('Failed to update like status:', error);
+      toast.error('Failed to update like status');
+    }
+  };
 
   if (selectedArticle && dataLoaded) {
     return (
@@ -165,6 +262,35 @@ export default function ArticlesPage() {
           {selectedArticle.images.length > 0 && (
             <ImageCarousel images={selectedArticle.images} />
           )}
+
+          {/* Interaction Buttons */}
+          <div className="flex gap-3 py-4 border-t-2 border-b-2 border-foreground">
+            <button
+              onClick={() => handleMarkAsRead(selectedArticle.id)}
+              className={`flex items-center gap-2 px-4 py-2 font-bold border-2 transition-all cursor-pointer ${
+                userInteractions[selectedArticle.id]?.isRead
+                  ? 'bg-accent-cyan text-background border-accent-cyan'
+                  : 'bg-secondary text-foreground border-foreground hover:bg-accent-cyan/20'
+              }`}
+              style={{ boxShadow: '2px 2px 0px #000' }}
+            >
+              <CheckCircle className="w-5 h-5" />
+              {userInteractions[selectedArticle.id]?.isRead ? 'Read' : 'Mark as Read'}
+            </button>
+            
+            <button
+              onClick={() => handleLike(selectedArticle.id)}
+              className={`flex items-center gap-2 px-4 py-2 font-bold border-2 transition-all cursor-pointer ${
+                userInteractions[selectedArticle.id]?.isLiked
+                  ? 'bg-red-500 text-white border-red-500'
+                  : 'bg-secondary text-foreground border-foreground hover:bg-red-500/20'
+              }`}
+              style={{ boxShadow: '2px 2px 0px #000' }}
+            >
+              <Heart className={`w-5 h-5 ${userInteractions[selectedArticle.id]?.isLiked ? 'fill-current' : ''}`} />
+              {userInteractions[selectedArticle.id]?.isLiked ? 'Liked' : 'Like'}
+            </button>
+          </div>
 
           <div
             className="prose prose-invert prose-lg max-w-none
@@ -311,6 +437,16 @@ export default function ArticlesPage() {
                       <span className="flex items-center gap-1"><User className="w-3 h-3" /> {article.author}</span>
                       <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {article.createdAt}</span>
                     </div>
+                    
+                    {/* Interaction Stats in Grid */}
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-foreground/30">
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
+                        <Heart className="w-3 h-3" /> {(article as any).likeCount || 0}
+                      </span>
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
+                        <CheckCircle className="w-3 h-3" /> {(article as any).readCount || 0}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </button>
@@ -355,6 +491,35 @@ export default function ArticlesPage() {
                     {article.tags.map((tag) => (
                       <span key={tag} className="neu-badge-blue px-2 py-0.5 text-[10px]">{tag}</span>
                     ))}
+                  </div>
+                  
+                  {/* Interaction Stats */}
+                  <div className="flex items-center gap-3 mt-3 pt-2 border-t border-foreground/30">
+                    {/* Read Status Indicator */}
+                    {userInteractions[article.id]?.isRead ? (
+                      <span className="flex items-center gap-1 text-xs bg-accent-cyan text-background px-2 py-1 font-bold border border-accent-cyan">
+                        <CheckCircle className="w-3 h-3" /> Read
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-xs bg-orange-500/30 text-orange-300 px-2 py-1 font-bold border border-orange-500">
+                        ◯ Unread
+                      </span>
+                    )}
+                    
+                    {/* Like Status */}
+                    {userInteractions[article.id]?.isLiked && (
+                      <span className="flex items-center gap-1 text-xs bg-red-500 text-white px-2 py-1 font-bold border border-red-500">
+                        <Heart className="w-3.5 h-3.5 fill-current" /> Liked
+                      </span>
+                    )}
+                    
+                    {/* Stats */}
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground font-mono ml-auto">
+                      <Heart className="w-3 h-3" /> {(article as any).likeCount || 0}
+                    </span>
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
+                      <CheckCircle className="w-3 h-3" /> {(article as any).readCount || 0}
+                    </span>
                   </div>
                 </div>
               </button>

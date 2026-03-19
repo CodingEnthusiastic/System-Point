@@ -49,11 +49,22 @@ export const authAPI = {
 // Articles APIs
 export const articlesAPI = {
   getAll: () => api.get('/api/articles'),
-  getById: (id: string) => api.get(`/api/articles/${id}`),
+  getById: (id: string, userId?: string) => 
+    api.get(`/api/articles/${id}${userId ? `?userId=${userId}` : ''}`),
   create: (data: any) => api.post('/api/articles', data),
   update: (id: string, data: any) => api.put(`/api/articles/${id}`, data),
   delete: (id: string) => api.delete(`/api/articles/${id}`),
   cleanupBrokenImages: () => api.post('/api/articles/cleanup/broken-images', {}),
+  
+  // Article interactions
+  markAsRead: (id: string, isRead: boolean) => 
+    api.post(`/api/articles/${id}/read`, { isRead }),
+  like: (id: string, isLiked: boolean) => 
+    api.post(`/api/articles/${id}/like`, { isLiked }),
+  getInteractions: () => 
+    api.get('/api/user/article-interactions'),
+  batchUpdateInteractions: (interactions: Array<{ articleId: string; isRead?: boolean; isLiked?: boolean }>) =>
+    api.post('/api/user/article-interactions/batch', { interactions }),
 };
 
 // Courses APIs

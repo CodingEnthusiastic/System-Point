@@ -141,7 +141,7 @@ const upload = multer({ storage });
 
 // MongoDB connection
 let db;
-let authCollection, articlesCollection, quizzesCollection, usersCollection, verificationsCollection, leaderboardCollection, coursesCollection, courseTrackingCollection;
+let authCollection, articlesCollection, quizzesCollection, usersCollection, verificationsCollection, leaderboardCollection, coursesCollection, courseTrackingCollection, articleInteractionsCollection;
 
 const connectDB = async () => {
   try {
@@ -157,6 +157,7 @@ const connectDB = async () => {
     verificationsCollection = db.collection('verifications');
     leaderboardCollection = db.collection('leaderboard');
     courseTrackingCollection = db.collection('courseTracking');
+    articleInteractionsCollection = db.collection('articleInteractions');
 
     // Create indexes
     await authCollection.createIndex({ email: 1 }, { unique: true });
@@ -166,6 +167,13 @@ const connectDB = async () => {
     await courseTrackingCollection.createIndex({ userId: 1, courseId: 1 }, { unique: true });
     await courseTrackingCollection.createIndex({ userId: 1 });
     await courseTrackingCollection.createIndex({ courseId: 1 });
+    
+    // Article interactions indexes - critical for performance under load
+    await articleInteractionsCollection.createIndex({ userId: 1, articleId: 1 }, { unique: true });
+    await articleInteractionsCollection.createIndex({ articleId: 1 });
+    await articleInteractionsCollection.createIndex({ userId: 1 });
+    await articleInteractionsCollection.createIndex({ articleId: 1, isRead: 1 });
+    await articleInteractionsCollection.createIndex({ articleId: 1, isLiked: 1 });
     
     console.log('✓ Connected to MongoDB');
   } catch (error) {
@@ -610,23 +618,133 @@ app.get('/api/auth/profile', middleware.auth, async (req, res) => {
 });
 
 // ARTICLES ROUTES
+// Get all articles with interaction stats (optimized with aggregation)
 app.get('/api/articles', async (req, res) => {
   try {
-    const articles = await articlesCollection.find({}).toArray();
+    const userId = req.query.userId; // Optional: filter for specific user interactions
+
+    // Use aggregation pipeline for better performance
+    const pipeline = [
+      {
+        $lookup: {
+          from: 'articleInteractions',
+          let: { articleId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ['$articleId', '$$articleId'] }
+              }
+            },
+            {
+              $group: {
+                _id: '$articleId',
+                likeCount: { $sum: { $cond: ['$isLiked', 1, 0] } },
+                readCount: { $sum: { $cond: ['$isRead', 1, 0] } }
+              }
+            }
+          ],
+          as: 'stats'
+        }
+      },
+      {
+        $addFields: {
+          likeCount: { $ifNull: [{ $arrayElemAt: ['$stats.likeCount', 0] }, 0] },
+          readCount: { $ifNull: [{ $arrayElemAt: ['$stats.readCount', 0] }, 0] },
+          stats: '$$REMOVE'
+        }
+      },
+      {
+        $sort: { createdAt: -1 }
+      }
+    ];
+
+    const articles = await articlesCollection.aggregate(pipeline).toArray();
     res.json(articles);
   } catch (error) {
+    console.error('Failed to fetch articles:', error);
     res.status(500).json({ error: 'Failed to fetch articles' });
   }
 });
 
+// Get single article with user's interaction data
 app.get('/api/articles/:id', async (req, res) => {
   try {
     const objectId = toObjectId(req.params.id);
     if (!objectId) return res.status(400).json({ error: 'Invalid article ID' });
-    const article = await articlesCollection.findOne({ _id: objectId });
-    if (!article) return res.status(404).json({ error: 'Article not found' });
-    res.json(article);
+
+    const userId = req.query.userId;
+
+    // Aggregation pipeline for single article with stats
+    const pipeline = [
+      { $match: { _id: objectId } },
+      {
+        $lookup: {
+          from: 'articleInteractions',
+          let: { articleId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ['$articleId', '$$articleId'] }
+              }
+            },
+            {
+              $group: {
+                _id: '$articleId',
+                likeCount: { $sum: { $cond: ['$isLiked', 1, 0] } },
+                readCount: { $sum: { $cond: ['$isRead', 1, 0] } }
+              }
+            }
+          ],
+          as: 'stats'
+        }
+      },
+      {
+        $addFields: {
+          likeCount: { $ifNull: [{ $arrayElemAt: ['$stats.likeCount', 0] }, 0] },
+          readCount: { $ifNull: [{ $arrayElemAt: ['$stats.readCount', 0] }, 0] },
+          stats: '$$REMOVE'
+        }
+      }
+    ];
+
+    // If userId provided, add user-specific interaction data
+    if (userId) {
+      pipeline.push({
+        $lookup: {
+          from: 'articleInteractions',
+          let: { articleId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: { 
+                  $and: [
+                    { $eq: ['$articleId', '$$articleId'] },
+                    { $eq: ['$userId', userId] }
+                  ]
+                }
+              }
+            }
+          ],
+          as: 'userInteraction'
+        }
+      });
+
+      pipeline.push({
+        $addFields: {
+          userInteraction: { $arrayElemAt: ['$userInteraction', 0] }
+        }
+      });
+    }
+
+    const result = await articlesCollection.aggregate(pipeline).toArray();
+    
+    if (!result.length) {
+      return res.status(404).json({ error: 'Article not found' });
+    }
+
+    res.json(result[0]);
   } catch (error) {
+    console.error('Failed to fetch article:', error);
     res.status(500).json({ error: 'Failed to fetch article' });
   }
 });
@@ -701,6 +819,156 @@ app.delete('/api/articles/:id', middleware.auth, async (req, res) => {
     res.json({ message: 'Article deleted' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete article' });
+  }
+});
+
+// ARTICLE INTERACTIONS - Mark article as read
+app.post('/api/articles/:id/read', middleware.auth, async (req, res) => {
+  try {
+    const articleId = req.params.id;
+    const userId = req.user.id;
+
+    if (!articleId || !userId) {
+      return res.status(400).json({ error: 'Missing articleId or userId' });
+    }
+
+    // Use updateOne with upsert to atomically handle read/unread toggle
+    const { isRead } = req.body;
+
+    const result = await articleInteractionsCollection.updateOne(
+      { userId, articleId },
+      {
+        $set: {
+          userId,
+          articleId,
+          isRead: isRead === true,
+          lastReadAt: isRead ? new Date() : null,
+          updatedAt: new Date()
+        }
+      },
+      { upsert: true }
+    );
+
+    res.json({ 
+      message: isRead ? 'Article marked as read' : 'Article marked as unread',
+      success: true,
+      isRead
+    });
+  } catch (error) {
+    console.error('Mark as read error:', error);
+    res.status(500).json({ error: 'Failed to mark article as read' });
+  }
+});
+
+// ARTICLE INTERACTIONS - Like/Unlike article
+app.post('/api/articles/:id/like', middleware.auth, async (req, res) => {
+  try {
+    const articleId = req.params.id;
+    const userId = req.user.id;
+
+    if (!articleId || !userId) {
+      return res.status(400).json({ error: 'Missing articleId or userId' });
+    }
+
+    const { isLiked } = req.body;
+
+    // Atomic update with upsert to handle like/unlike
+    const result = await articleInteractionsCollection.updateOne(
+      { userId, articleId },
+      {
+        $set: {
+          userId,
+          articleId,
+          isLiked: isLiked === true,
+          likedAt: isLiked ? new Date() : null,
+          updatedAt: new Date()
+        }
+      },
+      { upsert: true }
+    );
+
+    res.json({ 
+      message: isLiked ? 'Article liked' : 'Article unliked',
+      success: true,
+      isLiked
+    });
+  } catch (error) {
+    console.error('Like error:', error);
+    res.status(500).json({ error: 'Failed to update like status' });
+  }
+});
+
+// Get user's interactions with articles (for batch loading)
+app.get('/api/user/article-interactions', middleware.auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Fetch all user's interactions efficiently using find
+    const interactions = await articleInteractionsCollection
+      .find({ userId })
+      .project({ articleId: 1, isRead: 1, isLiked: 1 })
+      .toArray();
+
+    // Convert to map for easy lookup
+    const interactionMap = {};
+    interactions.forEach(interaction => {
+      interactionMap[interaction.articleId] = {
+        isRead: interaction.isRead || false,
+        isLiked: interaction.isLiked || false
+      };
+    });
+
+    res.json(interactionMap);
+  } catch (error) {
+    console.error('Fetch interactions error:', error);
+    res.status(500).json({ error: 'Failed to fetch interactions' });
+  }
+});
+
+// Batch update interactions (for performance optimization under load)
+app.post('/api/user/article-interactions/batch', middleware.auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const interactions = req.body.interactions; // Array of { articleId, isRead?, isLiked? }
+
+    if (!Array.isArray(interactions) || interactions.length === 0) {
+      return res.status(400).json({ error: 'Invalid interactions format' });
+    }
+
+    // Batch write operations
+    const operations = interactions.map(interaction => ({
+      updateOne: {
+        filter: { userId, articleId: interaction.articleId },
+        update: {
+          $set: {
+            userId,
+            articleId: interaction.articleId,
+            ...(interaction.isRead !== undefined && { 
+              isRead: interaction.isRead,
+              lastReadAt: interaction.isRead ? new Date() : null
+            }),
+            ...(interaction.isLiked !== undefined && { 
+              isLiked: interaction.isLiked,
+              likedAt: interaction.isLiked ? new Date() : null
+            }),
+            updatedAt: new Date()
+          }
+        },
+        upsert: true
+      }
+    }));
+
+    const result = await articleInteractionsCollection.bulkWrite(operations);
+
+    res.json({ 
+      message: 'Batch update completed',
+      success: true,
+      modified: result.modifiedCount,
+      upserted: result.upsertedCount
+    });
+  } catch (error) {
+    console.error('Batch update error:', error);
+    res.status(500).json({ error: 'Failed to batch update interactions' });
   }
 });
 
