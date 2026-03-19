@@ -329,10 +329,24 @@ export default function ArticlesPage() {
               <button
                 key={article.id}
                 onClick={() => navigate(`/articles/${article.id}`)}
-                className="w-full text-left p-4 border-b border-foreground hover:bg-primary/10 transition-colors group cursor-pointer flex items-center justify-between gap-4"
+                className="w-full text-left p-4 border-b border-foreground hover:bg-primary/10 transition-colors group cursor-pointer flex items-center gap-4"
               >
+                {/* Image Preview */}
+                <div className="w-32 h-24 shrink-0 border-2 border-foreground overflow-hidden flex items-center justify-center bg-secondary" style={{ boxShadow: '2px 2px 0px #000' }}>
+                  {article.images[0] ? (
+                    <img
+                      src={getImageUrl(article.images[0])}
+                      alt={article.title}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="text-center text-muted-foreground text-xs font-mono">No Image</div>
+                  )}
+                </div>
+
+                {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-lg group-hover:text-primary transition-colors truncate">{article.title}</h3>
+                  <h3 className="font-bold text-lg group-hover:text-primary transition-colors line-clamp-2">{article.title}</h3>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono mt-2">
                     <span className="flex items-center gap-1"><User className="w-3 h-3" /> {article.author}</span>
                     <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {article.createdAt}</span>
