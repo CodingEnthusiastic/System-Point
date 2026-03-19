@@ -100,8 +100,8 @@ export interface Article {
   author: string;
   createdAt: string;
   tags: string[];
-  likeCount?: number;
-  readCount?: number;
+  likeCount: number;
+  readCount: number;
 }
 
 export const articles: Article[] = [
@@ -126,6 +126,8 @@ export const articles: Article[] = [
     author: 'Admin User',
     createdAt: '2024-12-15',
     tags: ['Distributed Systems', 'CAP Theorem', 'Fundamentals'],
+    likeCount: 0,
+    readCount: 0,
   },
   {
     id: '2',
@@ -145,6 +147,8 @@ export const articles: Article[] = [
     author: 'Admin User',
     createdAt: '2024-12-20',
     tags: ['Database', 'Sharding', 'Scalability'],
+    likeCount: 0,
+    readCount: 0,
   },
   {
     id: '3',
@@ -165,6 +169,8 @@ export const articles: Article[] = [
     author: 'Admin User',
     createdAt: '2025-01-05',
     tags: ['Architecture', 'Microservices', 'Monolith'],
+    likeCount: 0,
+    readCount: 0,
   },
 ];
 

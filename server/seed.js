@@ -85,6 +85,8 @@ const articles = [
     author: 'Admin',
     createdAt: new Date('2024-12-15'),
     tags: ['Distributed Systems', 'CAP Theorem', 'Fundamentals'],
+    likeCount: 0,
+    readCount: 0,
   },
   {
     title: 'Database Sharding Strategies',
@@ -103,6 +105,8 @@ const articles = [
     author: 'Admin',
     createdAt: new Date('2024-12-20'),
     tags: ['Database', 'Sharding', 'Scalability'],
+    likeCount: 0,
+    readCount: 0,
   },
   {
     title: 'Load Balancing Techniques',
@@ -120,6 +124,8 @@ const articles = [
     author: 'Admin',
     createdAt: new Date('2024-12-25'),
     tags: ['Load Balancing', 'Scalability', 'Infrastructure'],
+    likeCount: 0,
+    readCount: 0,
   },
 ];
 

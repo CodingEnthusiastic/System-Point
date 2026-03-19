@@ -618,47 +618,15 @@ app.get('/api/auth/profile', middleware.auth, async (req, res) => {
 });
 
 // ARTICLES ROUTES
-// Get all articles with interaction stats (optimized with aggregation)
+// Get all articles with like/read counts (counts stored on article documents)
 app.get('/api/articles', async (req, res) => {
   try {
-    const userId = req.query.userId; // Optional: filter for specific user interactions
-
-    // Use aggregation pipeline for better performance
-    const pipeline = [
-      {
-        $lookup: {
-          from: 'articleInteractions',
-          let: { articleId: '$_id' },
-          pipeline: [
-            {
-              $match: {
-                $expr: { $eq: ['$articleId', '$$articleId'] }
-              }
-            },
-            {
-              $group: {
-                _id: '$articleId',
-                likeCount: { $sum: { $cond: ['$isLiked', 1, 0] } },
-                readCount: { $sum: { $cond: ['$isRead', 1, 0] } }
-              }
-            }
-          ],
-          as: 'stats'
-        }
-      },
-      {
-        $addFields: {
-          likeCount: { $ifNull: [{ $arrayElemAt: ['$stats.likeCount', 0] }, 0] },
-          readCount: { $ifNull: [{ $arrayElemAt: ['$stats.readCount', 0] }, 0] },
-          stats: '$$REMOVE'
-        }
-      },
-      {
-        $sort: { createdAt: -1 }
-      }
-    ];
-
-    const articles = await articlesCollection.aggregate(pipeline).toArray();
+    // Simple fetch - no aggregation needed since counts are stored on articles
+    const articles = await articlesCollection
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+    
     res.json(articles);
   } catch (error) {
     console.error('Failed to fetch articles:', error);
@@ -674,75 +642,22 @@ app.get('/api/articles/:id', async (req, res) => {
 
     const userId = req.query.userId;
 
-    // Aggregation pipeline for single article with stats
-    const pipeline = [
-      { $match: { _id: objectId } },
-      {
-        $lookup: {
-          from: 'articleInteractions',
-          let: { articleId: '$_id' },
-          pipeline: [
-            {
-              $match: {
-                $expr: { $eq: ['$articleId', '$$articleId'] }
-              }
-            },
-            {
-              $group: {
-                _id: '$articleId',
-                likeCount: { $sum: { $cond: ['$isLiked', 1, 0] } },
-                readCount: { $sum: { $cond: ['$isRead', 1, 0] } }
-              }
-            }
-          ],
-          as: 'stats'
-        }
-      },
-      {
-        $addFields: {
-          likeCount: { $ifNull: [{ $arrayElemAt: ['$stats.likeCount', 0] }, 0] },
-          readCount: { $ifNull: [{ $arrayElemAt: ['$stats.readCount', 0] }, 0] },
-          stats: '$$REMOVE'
-        }
-      }
-    ];
-
-    // If userId provided, add user-specific interaction data
-    if (userId) {
-      pipeline.push({
-        $lookup: {
-          from: 'articleInteractions',
-          let: { articleId: '$_id' },
-          pipeline: [
-            {
-              $match: {
-                $expr: { 
-                  $and: [
-                    { $eq: ['$articleId', '$$articleId'] },
-                    { $eq: ['$userId', userId] }
-                  ]
-                }
-              }
-            }
-          ],
-          as: 'userInteraction'
-        }
-      });
-
-      pipeline.push({
-        $addFields: {
-          userInteraction: { $arrayElemAt: ['$userInteraction', 0] }
-        }
-      });
-    }
-
-    const result = await articlesCollection.aggregate(pipeline).toArray();
+    const article = await articlesCollection.findOne({ _id: objectId });
     
-    if (!result.length) {
+    if (!article) {
       return res.status(404).json({ error: 'Article not found' });
     }
 
-    res.json(result[0]);
+    // If userId provided, fetch user's specific interactions
+    if (userId) {
+      const userInteraction = await articleInteractionsCollection.findOne({
+        userId,
+        articleId: req.params.id
+      });
+      article.userInteraction = userInteraction || null;
+    }
+
+    res.json(article);
   } catch (error) {
     console.error('Failed to fetch article:', error);
     res.status(500).json({ error: 'Failed to fetch article' });
@@ -832,10 +747,21 @@ app.post('/api/articles/:id/read', middleware.auth, async (req, res) => {
       return res.status(400).json({ error: 'Missing articleId or userId' });
     }
 
-    // Use updateOne with upsert to atomically handle read/unread toggle
     const { isRead } = req.body;
 
-    const result = await articleInteractionsCollection.updateOne(
+    // Get previous interaction state and current article counts
+    const previousInteraction = await articleInteractionsCollection.findOne({ userId, articleId });
+    const article = await articlesCollection.findOne({ _id: toObjectId(articleId) });
+    
+    const wasRead = previousInteraction?.isRead || false;
+    const currentReadCount = article?.readCount || 0;
+    const currentLikeCount = article?.likeCount || 0;
+    
+    const shouldIncrement = isRead && !wasRead;  // Going from unread to read
+    const shouldDecrement = !isRead && wasRead;  // Going from read to unread
+
+    // Update interaction with previous state counts for audit trail
+    await articleInteractionsCollection.updateOne(
       { userId, articleId },
       {
         $set: {
@@ -843,11 +769,26 @@ app.post('/api/articles/:id/read', middleware.auth, async (req, res) => {
           articleId,
           isRead: isRead === true,
           lastReadAt: isRead ? new Date() : null,
+          prevReadCount: currentReadCount,  // Store count at time of interaction
+          prevLikeCount: currentLikeCount,  // Store count at time of interaction
           updatedAt: new Date()
         }
       },
       { upsert: true }
     );
+
+    // Update article read count
+    if (shouldIncrement) {
+      await articlesCollection.updateOne(
+        { _id: toObjectId(articleId) },
+        { $inc: { readCount: 1 } }
+      );
+    } else if (shouldDecrement) {
+      await articlesCollection.updateOne(
+        { _id: toObjectId(articleId) },
+        { $inc: { readCount: -1 } }
+      );
+    }
 
     res.json({ 
       message: isRead ? 'Article marked as read' : 'Article marked as unread',
@@ -872,8 +813,19 @@ app.post('/api/articles/:id/like', middleware.auth, async (req, res) => {
 
     const { isLiked } = req.body;
 
-    // Atomic update with upsert to handle like/unlike
-    const result = await articleInteractionsCollection.updateOne(
+    // Get previous interaction state and current article counts
+    const previousInteraction = await articleInteractionsCollection.findOne({ userId, articleId });
+    const article = await articlesCollection.findOne({ _id: toObjectId(articleId) });
+    
+    const wasLiked = previousInteraction?.isLiked || false;
+    const currentReadCount = article?.readCount || 0;
+    const currentLikeCount = article?.likeCount || 0;
+    
+    const shouldIncrement = isLiked && !wasLiked;  // Going from unliked to liked
+    const shouldDecrement = !isLiked && wasLiked;  // Going from liked to unliked
+
+    // Update interaction with previous state counts for audit trail
+    await articleInteractionsCollection.updateOne(
       { userId, articleId },
       {
         $set: {
@@ -881,11 +833,26 @@ app.post('/api/articles/:id/like', middleware.auth, async (req, res) => {
           articleId,
           isLiked: isLiked === true,
           likedAt: isLiked ? new Date() : null,
+          prevReadCount: currentReadCount,  // Store count at time of interaction
+          prevLikeCount: currentLikeCount,  // Store count at time of interaction
           updatedAt: new Date()
         }
       },
       { upsert: true }
     );
+
+    // Update article like count
+    if (shouldIncrement) {
+      await articlesCollection.updateOne(
+        { _id: toObjectId(articleId) },
+        { $inc: { likeCount: 1 } }
+      );
+    } else if (shouldDecrement) {
+      await articlesCollection.updateOne(
+        { _id: toObjectId(articleId) },
+        { $inc: { likeCount: -1 } }
+      );
+    }
 
     res.json({ 
       message: isLiked ? 'Article liked' : 'Article unliked',

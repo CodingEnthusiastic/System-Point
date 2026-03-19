@@ -444,6 +444,16 @@ export default function ArticlesPage() {
                       <span className="flex items-center gap-1"><User className="w-3 h-3" /> {article.author}</span>
                       <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {article.createdAt}</span>
                     </div>
+                    
+                    {/* Like and Read Counts */}
+                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-foreground/30">
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
+                        <Heart className="w-3 h-3 text-red-500" /> {article.likeCount}
+                      </span>
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
+                        <CheckCircle className="w-3 h-3 text-accent-cyan" /> {article.readCount}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </button>
@@ -512,10 +522,10 @@ export default function ArticlesPage() {
                     
                     {/* Stats */}
                     <span className="flex items-center gap-1 text-xs text-muted-foreground font-mono ml-auto">
-                      <Heart className="w-3 h-3" /> {(article as any).likeCount || 0}
+                      <Heart className="w-3 h-3 text-red-500" /> <span className="font-bold">{article.likeCount}</span>
                     </span>
                     <span className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
-                      <CheckCircle className="w-3 h-3" /> {(article as any).readCount || 0}
+                      <CheckCircle className="w-3 h-3 text-accent-cyan" /> <span className="font-bold">{article.readCount}</span>
                     </span>
                   </div>
                 </div>
