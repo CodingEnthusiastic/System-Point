@@ -10,6 +10,10 @@ import QuizzesPage from '@/pages/QuizzesPage';
 import ProfilePage from '@/pages/ProfilePage';
 import AdminPage from '@/pages/AdminPage';
 import LeaderboardPage from '@/pages/LeaderboardPage';
+import TermsPage from '@/pages/TermsPage';
+import PrivacyPage from '@/pages/PrivacyPage';
+import DisclaimerPage from '@/pages/DisclaimerPage';
+import ContactPage from '@/pages/ContactPage';
 
 export default function App() {
   return (
@@ -30,6 +34,10 @@ export default function App() {
             <Route path="/leaderboard/:id" element={<LeaderboardPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/disclaimer" element={<DisclaimerPage />} />
+            <Route path="/contact" element={<ContactPage />} />
           </Route>
         </Routes>
       </AuthProvider>

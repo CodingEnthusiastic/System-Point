@@ -4,7 +4,12 @@ import { Github, Linkedin, Globe, Youtube } from 'lucide-react'
 
 export function Footer() {
   const currentYear = new Date().getFullYear()
-
+  const legalLinks = [
+    { name: 'Terms & Conditions', url: '/terms' },
+    { name: 'Privacy Policy', url: '/privacy' },
+    { name: 'Disclaimer', url: '/disclaimer' },
+    { name: 'Contact Us', url: '/contact' },
+  ]
   const socialLinks = [
     {
       name: 'GitHub',
@@ -33,7 +38,6 @@ export function Footer() {
     { name: 'Learn', url: '/learn' },
     { name: 'Articles', url: '/articles' },
     { name: 'Quizzes', url: '/quizzes' },
-    { name: 'Leaderboard', url: '/leaderboard' },
     { name: 'Profile', url: '/profile' },
   ]
 
@@ -90,38 +94,16 @@ export function Footer() {
             <div className="md:col-span-1">
               <h4 className="text-lg font-bold mb-6">Legal</h4>
               <ul className="space-y-3">
-                <li>
-                  <a
-                    href="#terms"
-                    className="text-foreground/70 hover:text-foreground transition-colors duration-200 text-sm"
-                  >
-                    Terms & Conditions
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="#privacy"
-                    className="text-foreground/70 hover:text-foreground transition-colors duration-200 text-sm"
-                  >
-                    Privacy Policy
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="#disclaimer"
-                    className="text-foreground/70 hover:text-foreground transition-colors duration-200 text-sm"
-                  >
-                    Disclaimer
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="#contact"
-                    className="text-foreground/70 hover:text-foreground transition-colors duration-200 text-sm"
-                  >
-                    Contact Us
-                  </a>
-                </li>
+                {legalLinks.map((link) => (
+                  <li key={link.name}>
+                    <a
+                      href={link.url}
+                      className="text-foreground/70 hover:text-foreground transition-colors duration-200 text-sm"
+                    >
+                      {link.name}
+                    </a>
+                  </li>
+                ))}
               </ul>
             </div>
           </div>
