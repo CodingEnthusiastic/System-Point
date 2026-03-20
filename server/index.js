@@ -1464,6 +1464,75 @@ app.get('/api/user/courses/progress', middleware.auth, async (req, res) => {
   }
 });
 
+// Mark lesson as complete
+app.post('/api/courses/:courseId/lessons/:lessonId/complete', middleware.auth, async (req, res) => {
+  try {
+    const { courseId, lessonId } = req.params;
+    const { isComplete } = req.body;
+    const userId = req.user._id || req.user.id;
+
+    const setObj = {};
+    setObj[`lessons.${lessonId}.completed`] = isComplete === true;
+    if (isComplete) {
+      setObj[`lessons.${lessonId}.completedAt`] = new Date();
+    }
+    setObj[`lessons.${lessonId}.lastAccessed`] = new Date();
+
+    const result = await courseTrackingCollection.findOneAndUpdate(
+      { userId: userId.toString(), courseId },
+      {
+        $set: {
+          ...setObj,
+          updatedAt: new Date()
+        },
+        $setOnInsert: {
+          userId: userId.toString(),
+          courseId,
+          startedAt: new Date()
+        }
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
+
+    res.json({ message: 'Lesson completion updated', tracking: result.value });
+  } catch (error) {
+    console.error('Mark lesson complete error:', error);
+    res.status(500).json({ error: 'Failed to mark lesson complete' });
+  }
+});
+
+// Get user's completed lessons across all courses
+app.get('/api/user/completed-lessons', middleware.auth, async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+
+    const allProgress = await courseTrackingCollection
+      .find({ userId: userId.toString() })
+      .toArray();
+
+    // Aggregate all completed lesson IDs
+    const completedLessons = [];
+    const courseProgress = {};
+
+    allProgress.forEach(progress => {
+      courseProgress[progress.courseId] = progress.lessons || {};
+      Object.keys(progress.lessons || {}).forEach(lessonId => {
+        if (progress.lessons[lessonId].completed) {
+          completedLessons.push(lessonId);
+        }
+      });
+    });
+
+    res.json({ 
+      completedLessons,
+      courseProgress
+    });
+  } catch (error) {
+    console.error('Get completed lessons error:', error);
+    res.status(500).json({ error: 'Failed to fetch completed lessons' });
+  }
+});
+
 // ========== USERS MANAGEMENT ==========
 // Get all users (admin only)
 app.get('/api/users', middleware.admin, async (req, res) => {
