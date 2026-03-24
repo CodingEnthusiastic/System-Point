@@ -99,6 +99,8 @@ npm run lint         # Run linter
 ## Some Insights
 <img width="1919" height="911" alt="image" src="https://github.com/user-attachments/assets/ead916f7-c200-4169-9c4a-4791c65ceea7" />
 <img width="1919" height="970" alt="image" src="https://github.com/user-attachments/assets/5b965b59-3e8d-4c2c-8087-753430901b35" />
+<img width="1918" height="966" alt="image" src="https://github.com/user-attachments/assets/b99726b9-dbcc-4452-b249-d55240baa345" />
+<img width="1919" height="969" alt="image" src="https://github.com/user-attachments/assets/4fb095ec-3a4f-4903-87b5-71322b8c6d4e" />
 
 
 
