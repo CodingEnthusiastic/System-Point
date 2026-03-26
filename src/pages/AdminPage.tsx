@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Course, Article, Quiz, Lesson, QuizQuestion } from '@/data/mockData';
-import { Plus, Trash2, Edit3, BookOpen, FileText, Brain, Users, X, Save, Loader, Link2, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Edit3, BookOpen, FileText, Brain, Users, X, Save, Loader, Link2, RefreshCw, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { articlesAPI, quizzesAPI, coursesAPI, usersAPI } from '@/lib/api';
@@ -12,6 +12,7 @@ type Tab = 'courses' | 'articles' | 'quizzes' | 'users';
 
 export default function AdminPage() {
   const { isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('courses');
 
   // Initialize with empty state - will load from DB
