@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { BookOpen, FileText, Brain, ArrowRight, Server, Database, Globe, Layers, Cpu, Network } from 'lucide-react';
 import { motion } from 'framer-motion';
-import PageLoader from '@/components/PageLoader';
 import { useState, useEffect } from 'react';
 import { usersAPI, coursesAPI, quizzesAPI, articlesAPI } from '@/lib/api';
 
@@ -105,7 +104,7 @@ export default function LandingPage() {
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-block mb-8">
               <span className="neu-badge-blue px-6 py-3 text-base font-semibold">
-                Welcome! 👋
+                 Welcome back, {user?.username} 👋
               </span>
             </div>
             <h1 className="text-6xl md:text-8xl font-bold tracking-tight mb-8 leading-tight">
@@ -145,7 +144,7 @@ export default function LandingPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.1 }}
-        className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4"
+        className="max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4"
       >
         {stats.map((stat) => (
           <div key={stat.label} className="neu-card p-8 text-center">
@@ -200,7 +199,6 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
-      <PageLoader isLoading={loading} message="Loading..." />
       </div>
     </>
   );
