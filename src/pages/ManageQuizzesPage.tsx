@@ -123,40 +123,60 @@ export default function ManageQuizzesPage() {
         })),
       }));
 
-      setQuizForm((p) => ({
-        ...p,
-        ...newQuizzes[0],
-      }));
+      const importedQuiz = newQuizzes[0];
+      
+      // Set both editingQuiz and quizForm so save works properly
+      setEditingQuiz(importedQuiz);
+      setQuizForm({
+        title: importedQuiz.title,
+        topic: importedQuiz.topic,
+        questions: importedQuiz.questions,
+      });
 
-      alert('✅ Quiz data imported! Now save the quiz to create it.');
+      alert('✅ Quiz data imported! Click "Save Quiz" to create it.');
       setJsonInput('');
       setShowJsonImport(false);
     } catch (error) {
-      alert('❌ Invalid JSON format');
+      alert('❌ Invalid JSON format. Make sure it matches the expected structure.');
     }
   };
 
   const saveQuiz = async () => {
-    if (!editingQuiz || !quizForm.title || !quizForm.topic) {
-      alert('Title and topic are required');
+    if (!quizForm.title?.trim()) {
+      alert('❌ Please enter a quiz title');
+      return;
+    }
+
+    if (!quizForm.topic?.trim()) {
+      alert('❌ Please enter a quiz topic');
       return;
     }
 
     if (quizForm.questions.length === 0) {
-      alert('Add at least one question');
+      alert('❌ Add at least one question to the quiz');
+      return;
+    }
+
+    // Validate all questions have valid options
+    const invalidQuestions = quizForm.questions.filter(
+      (q) => q.options.length < 2 || !q.question.trim()
+    );
+    if (invalidQuestions.length > 0) {
+      alert('❌ Each question must have at least 2 options');
       return;
     }
 
     const quiz: Quiz = {
       ...editingQuiz,
-      id: editingQuiz.id || String(Date.now()),
+      id: editingQuiz?.id || String(Date.now()),
       title: quizForm.title,
       topic: quizForm.topic,
       questions: quizForm.questions,
     };
 
     try {
-      if (editingQuiz.id) {
+      setIsLoading(true);
+      if (editingQuiz?.id) {
         await quizzesAPI.update(quiz.id, {
           title: quiz.title,
           topic: quiz.topic,
@@ -165,6 +185,7 @@ export default function ManageQuizzesPage() {
         setQuizzesList((p) =>
           p.map((q) => (q.id === quiz.id ? quiz : q))
         );
+        alert('✅ Quiz updated successfully!');
       } else {
         const response = await quizzesAPI.create({
           title: quiz.title,
@@ -172,12 +193,19 @@ export default function ManageQuizzesPage() {
           questions: quiz.questions,
         });
         setQuizzesList((p) => [...p, { ...quiz, id: response.data._id }]);
+        alert('✅ Quiz created successfully!');
       }
       setEditingQuiz(null);
       setQuizForm({ title: '', topic: '', questions: [] });
       setEditingQuestionIndex(null);
-    } catch (error) {
-      alert('Failed to save quiz');
+    } catch (error: any) {
+      console.error('Quiz save error:', error);
+      alert(
+        error?.response?.data?.message ||
+        '❌ Failed to save quiz. Please check your connection and try again.'
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
