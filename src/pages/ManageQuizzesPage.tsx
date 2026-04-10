@@ -125,7 +125,7 @@ export default function ManageQuizzesPage() {
 
       setQuizForm((p) => ({
         ...p,
-        ...newQuizzesToImport[0],
+        ...newQuizzes[0],
       }));
 
       alert('✅ Quiz data imported! Now save the quiz to create it.');
