@@ -106,38 +106,94 @@ export default function ManageQuizzesPage() {
     setEditingQuestionIndex(index);
   };
 
-  const importQuizzesFromJson = () => {
+  const importQuizzesFromJson = async () => {
     try {
-      const data = JSON.parse(jsonInput);
+      let data = JSON.parse(jsonInput);
+      
+      // Handle nested structure: { "quiz": { ... } }
+      if (data.quiz && !Array.isArray(data)) {
+        data = data.quiz;
+      }
+      
+      // Convert to array if single object
       const quizzesToImport = Array.isArray(data) ? data : [data];
 
-      const newQuizzes = quizzesToImport.map((q: any) => ({
-        id: String(Date.now()) + Math.random(),
-        title: q.title,
-        topic: q.topic,
-        questions: (q.questions || []).map((question: any) => ({
-          id: String(Date.now()) + Math.random(),
-          question: question.question,
-          options: question.options,
-          correctAnswer: question.correctAnswer,
-        })),
-      }));
+      // Validate each quiz before importing
+      for (const q of quizzesToImport) {
+        if (!q.title?.trim()) {
+          alert('❌ Each quiz must have a title');
+          return;
+        }
+        
+        // Topic is optional but if provided must not be empty
+        const topic = q.topic?.trim() || 'General';
+        
+        if (!q.questions || q.questions.length === 0) {
+          alert('❌ Each quiz must have at least one question');
+          return;
+        }
+        
+        // Validate questions
+        for (const question of q.questions) {
+          if (!question.question?.trim()) {
+            alert('❌ All questions must have text');
+            return;
+          }
+          if (!question.options || question.options.length < 2) {
+            alert('❌ Each question must have at least 2 options');
+            return;
+          }
+          if (question.correctAnswer === undefined || question.correctAnswer === null) {
+            alert('❌ All questions must have a correct answer index');
+            return;
+          }
+        }
+      }
 
-      const importedQuiz = newQuizzes[0];
+      // Direct save to database for each quiz
+      setIsLoading(true);
+      let successCount = 0;
+
+      for (const q of quizzesToImport) {
+        const quizData = {
+          title: q.title?.trim(),
+          topic: q.topic?.trim() || 'General',
+          questions: q.questions.map((question: any) => ({
+            question: question.question?.trim(),
+            options: Array.isArray(question.options) 
+              ? question.options.map((opt: string) => opt?.trim() || '')
+              : question.options,
+            correctAnswer: typeof question.correctAnswer === 'number' 
+              ? question.correctAnswer 
+              : 0,
+          })),
+        };
+
+        try {
+          await quizzesAPI.create(quizData);
+          successCount++;
+        } catch (error: any) {
+          console.error('Error saving quiz:', error);
+          alert(`❌ Failed to save "${q.title}": ${error?.response?.data?.message || error.message}`);
+          return;
+        }
+      }
+
+      // Reload quizzes list
+      await loadQuizzes();
       
-      // Set both editingQuiz and quizForm so save works properly
-      setEditingQuiz(importedQuiz);
-      setQuizForm({
-        title: importedQuiz.title,
-        topic: importedQuiz.topic,
-        questions: importedQuiz.questions,
-      });
-
-      alert('✅ Quiz data imported! Click "Save Quiz" to create it.');
       setJsonInput('');
       setShowJsonImport(false);
-    } catch (error) {
-      alert('❌ Invalid JSON format. Make sure it matches the expected structure.');
+      alert(`✅ Successfully imported ${successCount} quiz${successCount !== 1 ? 'zes' : ''}!`);
+      
+    } catch (error: any) {
+      if (error instanceof SyntaxError) {
+        alert('❌ Invalid JSON format. Please check your syntax and try again.');
+      } else {
+        alert(`❌ Error: ${error.message}`);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -228,6 +284,116 @@ export default function ManageQuizzesPage() {
         <p className="text-muted-foreground font-mono text-sm">CREATE AND MANAGE YOUR QUIZZES</p>
       </div>
 
+      {/* Direct JSON Import Section */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="neu-card-purple p-6 border-2 border-accent-purple"
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-bold uppercase tracking-wider mb-1">
+              <Upload className="w-5 h-5 inline mr-2" />
+              Import Quizzes from JSON
+            </h3>
+            <p className="text-xs text-muted-foreground font-mono">
+              Paste quiz JSON and it will be saved directly to the database
+            </p>
+          </div>
+          <button
+            onClick={() => setShowJsonImport(!showJsonImport)}
+            className="neu-btn px-3 py-2 text-sm cursor-pointer bg-accent-purple/20"
+          >
+            {showJsonImport ? 'Hide' : 'Show'} Import
+          </button>
+        </div>
+
+        {showJsonImport && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="space-y-4 border-t-2 border-accent-purple pt-4"
+          >
+            <div className="p-3 bg-secondary/50 rounded text-xs font-mono space-y-2">
+              <p className="font-bold text-primary">Supported JSON Formats:</p>
+              <details className="cursor-pointer">
+                <summary className="font-bold text-accent-purple hover:underline">
+                  Format 1: Nested (Recommended)
+                </summary>
+                <pre className="overflow-x-auto text-xs bg-black/20 p-2 rounded mt-2">
+{`{
+  "quiz": {
+    "title": "System Design Basics",
+    "topic": "Architecture",
+    "questions": [
+      {
+        "question": "What is X?",
+        "options": ["A", "B", "C", "D"],
+        "correctAnswer": 0
+      }
+    ]
+  }
+}`}
+                </pre>
+              </details>
+              <details className="cursor-pointer">
+                <summary className="font-bold text-accent-purple hover:underline">
+                  Format 2: Direct Object
+                </summary>
+                <pre className="overflow-x-auto text-xs bg-black/20 p-2 rounded mt-2">
+{`{
+  "title": "System Design Basics",
+  "topic": "Architecture",
+  "questions": [...]
+}`}
+                </pre>
+              </details>
+              <details className="cursor-pointer">
+                <summary className="font-bold text-accent-purple hover:underline">
+                  Format 3: Array
+                </summary>
+                <pre className="overflow-x-auto text-xs bg-black/20 p-2 rounded mt-2">
+{`[
+  {
+    "title": "Quiz 1",
+    "topic": "Topic 1",
+    "questions": [...]
+  }
+]`}
+                </pre>
+              </details>
+            </div>
+
+            <textarea
+              value={jsonInput}
+              onChange={(e) => setJsonInput(e.target.value)}
+              placeholder='Paste your quiz JSON here...'
+              className="neu-input w-full px-4 py-3 text-sm text-foreground font-mono h-32"
+            />
+
+            <div className="flex gap-2">
+              <button
+                onClick={importQuizzesFromJson}
+                disabled={!jsonInput.trim() || isLoading}
+                className="neu-btn-blue px-6 py-2 text-sm inline-flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Upload className="w-4 h-4" />
+                {isLoading ? 'Importing...' : 'Import & Save to Database'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowJsonImport(false);
+                  setJsonInput('');
+                }}
+                className="neu-btn px-6 py-2 text-sm bg-secondary cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </motion.div>
+
       {/* Quiz Editor Modal */}
       {editingQuiz && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -285,51 +451,7 @@ export default function ManageQuizzesPage() {
                 <h4 className="font-bold uppercase tracking-wider">
                   Questions ({quizForm.questions.length})
                 </h4>
-                <button
-                  onClick={() => {
-                    setShowJsonImport(!showJsonImport);
-                  }}
-                  className="neu-btn px-2 py-1 text-xs inline-flex items-center gap-1 cursor-pointer bg-accent-purple/20"
-                >
-                  <Upload className="w-3 h-3" /> Import JSON
-                </button>
               </div>
-
-              {/* JSON Import */}
-              {showJsonImport && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="mb-4 p-3 bg-accent-purple/10 border-2 border-accent-purple rounded space-y-2"
-                >
-                  <label className="block text-xs font-bold uppercase">
-                    Paste Questions JSON Array
-                  </label>
-                  <textarea
-                    value={jsonInput}
-                    onChange={(e) => setJsonInput(e.target.value)}
-                    placeholder='[{"question":"Q1?","options":["A","B","C","D"],"correctAnswer":0}]'
-                    className="neu-input w-full px-3 py-2 text-xs text-foreground font-mono h-24"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={importQuizzesFromJson}
-                      className="neu-btn-blue px-3 py-1 text-xs cursor-pointer"
-                    >
-                      Import
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowJsonImport(false);
-                        setJsonInput('');
-                      }}
-                      className="neu-btn px-3 py-1 text-xs bg-secondary cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </motion.div>
-              )}
 
               {/* Question Editor */}
               <div className="neu-card p-4 mb-6">
